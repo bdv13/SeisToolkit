@@ -5,7 +5,7 @@ from tkinter import filedialog
 
 import pandas as pd
 
-from seistoolkit.config import log_hdrs
+from config import log_dict
 
 
 def get_folder():
@@ -34,7 +34,7 @@ def get_file_path(folder_path):
 def create_log_file():
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
     log_path = os.path.join(desktop_path, "Log.xlsx")
-    df = pd.DataFrame(columns=list(log_hdrs.keys()))
+    df = pd.DataFrame(columns=list(log_dict.keys()))
     df.to_excel(log_path, index=False, engine="openpyxl")
     print("\nLog file created and placed here: ", log_path)
     return log_path
@@ -43,7 +43,7 @@ def create_log_file():
 def write_log_file(SGYFile, log_path):
     log_df = pd.read_excel(log_path)
     row = {}
-    for column_name, attr_name in log_hdrs.items():
+    for column_name, attr_name in log_dict.items():
         row[column_name] = getattr(SGYFile, attr_name)
     log_df.loc[len(log_df)] = row
     log_df.to_excel(log_path, index=False, engine="openpyxl")
