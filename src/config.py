@@ -1,3 +1,9 @@
+proj_settings = {
+    "proj_name": "MyProject",
+    "proj_crs": "EPSG:32636",
+    "proj_dir": "output",
+}
+
 hdrlen_dict = {
     "text_hdr": 3200,  # textual header
     "bin_hdr": 400,  # binary header
@@ -55,7 +61,8 @@ tr_dict = {
 }
 
 log_dict = {
-    "File": "name",
+    "Line": "name",
+    "Line_ID": "id",
     "Size_mb": "size_mb",
     "Traces": "tr_num",
     "Byte_order": "byte_order",
@@ -63,6 +70,9 @@ log_dict = {
     "Length_ms": "trlen_ms",
     "Sample_int_ms": "dt_ms",
     "Sample_freq_hz": "sample_freq_hz",
+    "Length_km": "line_len_km",
+    "Shot_int_m": "mean_step",
+    "Delay": "delay_flag",
 }
 
 units_dict = {

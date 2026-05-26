@@ -13,6 +13,7 @@ class SGYFile:
 
     def __init__(self, file_path):
         self.name = None  # dataset name
+        self.id = None  # dataset id
         self._path = file_path  # dataset path
         self.size_mb = None  # dataset size (MB)
         self.text_hdr = None  # texual header
@@ -32,6 +33,15 @@ class SGYFile:
         self.sou_y_list = []  # sorce y coordinates
         self.sac = None  # scaling factor for sou/rec coord
         self.units = None  # coordinate units
+        self.cumdists = []  # cumulative distance (m)
+        self.line_len = None  # total line length (m)
+        self.line_len_km = None  # total line length (km)
+        self.steps = []  # shot intervals (m)
+        self.mean_step = None  # mean shot interval (m)
+        self.delay_flag = None  # delay in dataset
+
+    def set_id(self, number):
+        self.id = number
 
     def get_name(self):
         self.name = Path(self._path).stem
@@ -125,3 +135,25 @@ class SGYFile:
 
             self.sou_x_list.append(round(src_x * self.sac, 3))
             self.sou_y_list.append(round(src_y * self.sac, 3))
+
+    def get_line_len(self):
+        try:
+            self.line_len = max(self.cumdists)
+            self.line_len_km = round(self.line_len / 1000, 2)
+        except ValueError:
+            self.line_len = "Unknown"
+            self.line_len_km = "Unknown"
+
+    def get_mean_step(self):
+        try:
+            self.mean_step = round(sum(self.steps) / len(self.steps), 2)
+        except Exception:
+            self.mean_step = "Unknown"
+
+    def get_delay_flag(self):
+        for tr_hdr in self.tr_hdrs:
+            delays = self.unpack_field("H", tr_hdr, tr_dict["delay"])
+            if delays:
+                self.delay_flag = True
+            else:
+                self.delay_flag = False
