@@ -7,10 +7,12 @@ from tkinter import filedialog
 
 import pandas as pd
 
-from config import log_dict, proj_settings
+from config import log_dict, proj_set
 
 
 def get_folder():
+    """Select folder with sgy files"""
+
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
@@ -35,7 +37,7 @@ def get_file_path(folder_path):
 
 def create_proj_dir():
     project_root = Path(__file__).resolve().parent
-    proj_dir_path = project_root / proj_settings["proj_dir"]
+    proj_dir_path = project_root / proj_set["proj_dir"]
     proj_dir_path.mkdir(exist_ok=True)
     return proj_dir_path
 
@@ -65,6 +67,5 @@ def timer(func):
         end = time.perf_counter()
         wrapper.elapsed_time = end - start
         return result
-
     wrapper.elapsed_time = 0
     return wrapper
