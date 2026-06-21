@@ -1,7 +1,6 @@
 proj_set = {
     'proj_name': 'MyProject',
     'proj_crs': 'EPSG:32636',
-    'proj_dir': 'output',
 }
 
 hdrlen = {
@@ -10,7 +9,7 @@ hdrlen = {
     'trace_hdr': 240
 }
 
-bin_hdr = {
+bin_dict = {
     'JOB_ID': ((0, 4), 'i'),
     'LINE_NO': ((4, 8), 'i'),
     'REEL_NO': ((8, 12), 'i'),
@@ -43,7 +42,7 @@ bin_hdr = {
     'FIXED_LEN_TR': ((302, 304), 'H'),
 }
 
-tr_hdr = {
+tr_dict = {
     'TRACENO': ((0, 4), 'i'),
     'SEQWR': ((4, 8), 'i'),
     'FFID': ((8, 12), 'i'),
@@ -148,6 +147,8 @@ log_dict = {
     'Line': 'name',
     'Size_mb': 'size_mb',
     'Traces': 'tr_amount',
+    'FFID_SOL': 'ffid_sol',
+    'FFID_EOL': 'ffid_eol',
     'dt_ms': 'dt_ms',
     'Length_ms': 'trlen_ms',
     'Sample_Freq_hz': 'smp_freq_hz',

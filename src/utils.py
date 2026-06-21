@@ -7,7 +7,7 @@ from tkinter import filedialog
 
 import pandas as pd
 
-from config import log_dict, proj_set
+from config import log_dict
 
 
 def get_folder():
@@ -16,13 +16,13 @@ def get_folder():
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
-    folder_path = filedialog.askdirectory(title="Select folder with sgy files")
+    folder_path = filedialog.askdirectory(title="Select folder")
     root.destroy()
     print("Selected folder: ", folder_path, end="\n\n")
     return folder_path
 
 
-def get_file_path(folder_path):
+def get_sgy_paths(folder_path):
     formats = (".sgy", ".segy")
     folder = Path(folder_path)
     number_files = 0
@@ -31,32 +31,27 @@ def get_file_path(folder_path):
         if file.is_file() and file.suffix.lower() in formats:
             file_paths.append(file)
             number_files += 1
-    print("Number of files: ", number_files)
-    return number_files, file_paths
+    print(f'Number of files found: {number_files}', end="\n\n")
+    return file_paths
 
 
-def create_proj_dir():
+def create_output_dir():
     project_root = Path(__file__).resolve().parent
-    proj_dir_path = project_root / proj_set["proj_dir"]
+    proj_dir_path = project_root / 'output'
     proj_dir_path.mkdir(exist_ok=True)
     return proj_dir_path
 
 
-def create_log_file(path):
+def create_log_path(path):
     log_path = os.path.join(path, "Log.xlsx")
     df = pd.DataFrame(columns=list(log_dict.keys()))
     df.to_excel(log_path, index=False, engine="openpyxl")
-    print("\nLog file created and placed here: ", path, end="\n\n")
     return log_path
 
 
-def write_log_file(SGYFile, log_path):
-    log_df = pd.read_excel(log_path)
-    row = {}
-    for column_name, attr_name in log_dict.items():
-        row[column_name] = getattr(SGYFile, attr_name)
-    log_df.loc[len(log_df)] = row
-    log_df.to_excel(log_path, index=False, engine="openpyxl")
+def get_size_mb(file_path):
+    size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+    return size_mb
 
 
 def timer(func):
