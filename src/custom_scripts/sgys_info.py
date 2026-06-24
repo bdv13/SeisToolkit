@@ -1,9 +1,10 @@
+import os
 import pandas as pd
 
-import utils as u
-from io_tools import sgy_input
-from config import log_dict, fmt_dict
-from geometry import get_geometry, compute_cumdist
+import stk.utils as u
+from stk.config import fmt_dict, log_dict
+from stk.geometry import compute_cumdist, get_geometry
+from stk.io_data import sgy_input
 
 
 def delay_flag(dataset):
@@ -34,6 +35,13 @@ def trace_enum(dataset, start_value=0):
     return trace_sol, trace_eol
 
 
+def create_log_file(path):
+    log_path = os.path.join(path, "Log.xlsx")
+    df = pd.DataFrame(columns=list(log_dict.keys()))
+    df.to_excel(log_path, index=False, engine="openpyxl")
+    return log_path
+
+
 def write_log_file(log_file, log_path):
     log_df = pd.read_excel(log_path)
     row = pd.Series(log_file)
@@ -47,37 +55,38 @@ def info(folder_path=None):
     if folder_path is None:
         folder_path = u.get_folder()
 
-    file_paths = u.get_sgy_paths(folder_path)
-    output_dir = u.create_output_dir()
-    log_path = u.create_log_path(output_dir)
+    file_paths = u.get_paths(folder_path, formats=(".sgy", ".segy"))
+    output_path = u.create_folder('output', folder_path)
+    log_path = create_log_file(output_path)
     log_file = log_dict.copy()
 
     current_trace = 0
 
     for idx, file_path in enumerate(file_paths):
-
         dataset = sgy_input(file_path)
 
-        log_file['Line'] = dataset.name
-        log_file['Size_mb'] = u.get_size_mb(file_path)
-        log_file['Traces'] = len(dataset.traces)
+        log_file["Line"] = dataset.name
+        log_file["Size_mb"] = u.get_size_mb(file_path)
+        log_file["Traces"] = len(dataset.traces)
 
         trace_sol, trace_eol = trace_enum(dataset, current_trace)
         current_trace = trace_eol
 
-        log_file['FFID_SOL'] = trace_sol
-        log_file['FFID_EOL'] = trace_eol
-        log_file['dt_ms'] = dataset.dt / 1000
-        log_file['Length_ms'] = dataset.dt * dataset.numsmp
-        log_file['Sample_Freq_hz'] = 1 / dataset.dt * 1000
-        log_file['Byte_order'] = dataset.byte_order
-        log_file['Format'] = fmt_dict[dataset.fmt_code][0]
-        log_file['Length_km'] = linelen_maxstep(dataset)[0]
-        log_file['Mean_step_m'] = linelen_maxstep(dataset)[1]
-        log_file['Delay'] = delay_flag(dataset)
+        log_file["FFID_SOL"] = trace_sol
+        log_file["FFID_EOL"] = trace_eol
+        log_file["dt_ms"] = dataset.dt / 1000
+        log_file["Length_ms"] = dataset.dt * dataset.numsmp / 1000
+        log_file["Sample_Freq_hz"] = 1_000_000 / dataset.dt
+        log_file["Byte_order"] = dataset.byte_order
+        log_file["Format"] = fmt_dict[dataset.fmt_code][0]
+        log_file["Length_km"] = linelen_maxstep(dataset)[0]
+        log_file["Mean_step_m"] = linelen_maxstep(dataset)[1]
+        log_file["Delay"] = delay_flag(dataset)
 
         write_log_file(log_file, log_path)
 
+
 if __name__ == "__main__":
+    print()
     info()
-    print(f'Done! Complited in {info.elapsed_time:.3f} sec',  end='\n\n')
+    print(f"Done! Complited in {info.elapsed_time:.3f} sec", end="\n\n")

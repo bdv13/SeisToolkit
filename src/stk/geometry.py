@@ -5,9 +5,9 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import LineString
 
-import utils as u
-from config import proj_set
-from io_tools import sgy_input
+import stk.utils as u
+from stk.config import proj_set
+from stk.io_data import sgy_input
 
 
 def get_geometry(dataset) -> tuple[float, float]:
@@ -83,30 +83,31 @@ class TracksExporter:
         df["CUMDIST"] = df["CUMDIST"].map(lambda x: f"{x:.2f}")
         df["STEP"] = df["STEP"].map(lambda x: f"{x:.2f}")
 
-        file_path = os.path.join(output_folder, dataset.name + '.csv')
-        df.to_csv(file_path, index=False, encoding='utf-8')
+        file_path = os.path.join(output_folder, dataset.name + ".csv")
+        df.to_csv(file_path, index=False, encoding="utf-8")
+
 
 @u.timer
-def export_nav(folder_path=None, crs=proj_set['proj_crs'], csv=False):
+def export_nav(folder_path=None, crs=proj_set["proj_crs"], csv=False):
 
     if folder_path is None:
         folder_path = u.get_folder()
 
     TracksExport = TracksExporter(crs)
 
-    file_paths = u.get_sgy_paths(folder_path)
-    output_dir = u.create_output_dir()
+    file_paths = u.get_paths(folder_path)
+    output_path = u.create_folder('output', folder_path)
 
     for idx, file_path in enumerate(file_paths):
         current_dataset = sgy_input(file_path)
         TracksExport.add_dataset(current_dataset)
         if csv:
-            TracksExport.export_csv(current_dataset, output_dir)
+            TracksExport.export_csv(current_dataset, output_path)
 
-    TracksExport.export_gpkg(output_dir)
+    TracksExport.export_gpkg(output_path)
 
 
 if __name__ == "__main__":
-    print('Please select folder with seg files', end='\n\n')
+    print("Please select folder with seg files", end="\n\n")
     export_nav()
-    print(f'Done! Complited in {export_nav.elapsed_time:.3f} sec',  end='\n\n')
+    print(f"Done! Complited in {export_nav.elapsed_time:.3f} sec", end="\n\n")

@@ -32,6 +32,8 @@ pytest==9.0.3
 python-dateutil==2.9.0.post0
 pytokens==0.4.1
 ruff==0.15.15
+scipy==1.18.0
+-e git+https://github.com/bdv13/SeisToolkit.git@23ba421d6c868eb27db65f9251e529b66dece924#egg=seistoolkit
 shapely==2.1.2
 six==1.17.0
 tzdata==2026.2
