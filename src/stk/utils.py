@@ -7,7 +7,7 @@ from tkinter import filedialog
 from typing import Any
 
 
-def get_file() -> Path:
+def get_file() -> str:
     """Select file. Returns folder path."""
 
     root = tk.Tk()
@@ -21,7 +21,7 @@ def get_file() -> Path:
     return file_path
 
 
-def get_folder() -> Path:
+def get_folder() -> str:
     """Select folder. Returns file path"""
 
     root = tk.Tk()

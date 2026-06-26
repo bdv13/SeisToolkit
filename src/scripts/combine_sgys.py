@@ -1,8 +1,42 @@
+from pathlib import Path
+import shutil
+
 import stk.utils as u
 from stk.models import Dataset
 from stk.geometry import compute_cumdist, get_geometry
 from stk.headers import create_text_hdr, hdr_enumerator
 from stk.io_data import sgy_input, sgy_output
+
+
+def separate_files(operation='copy'):
+
+    folder_path = Path(u.get_folder())
+    files_list = Path(u.get_file())
+
+    output_folder = u.create_folder('separated_files', folder_path)
+
+    with open(files_list, 'r', encoding='utf-8') as f:
+        files = [line.strip() for line in f if line.strip()]
+
+    for file in files:
+
+        file_name = Path(file).name
+
+        source_file = folder_path / file_name
+        destination_file = Path(output_folder) / file_name
+
+        if not source_file.exists():
+            print(f'File not found: {source_file}')
+            continue
+
+        if operation == 'copy':
+            shutil.copy2(source_file, destination_file)
+
+        elif operation == 'cut':
+            shutil.move(source_file, destination_file)
+
+        else:
+            raise ValueError("Unknown command!")
 
 
 def is_compatible(datasets):
@@ -89,7 +123,17 @@ def main():
         output_path = output_folder / f"Line_{group_number}.sgy"
         sgy_output(combined_dataset, output_path)
 
+        print(f'Group {group_number} exported successfully!')
+
 
 if __name__ == "__main__":
+    print()
+    print("Please, select 'Groups' folder with groups.", end="\n\n")
     main()
+    print()
     print(f"Done! Complited in {main.elapsed_time:.3f} sec", end="\n\n")
+    print("Select folder (unmerged files), then single lines list", end="\n\n")
+    separate_files()
+    print("Done!")
+
+

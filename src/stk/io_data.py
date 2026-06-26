@@ -64,10 +64,11 @@ def decode_trace(raw_tr: bytes, fmt_code: int, byte_order: str) -> np.ndarray:
 
 
 def sgy_input(file_path: Path) -> Dataset:
-    """Read a SEG-Y file and return a Dataset object."""
+    """Read a SEG-Y file and return a dataset object."""
+
+    file_name = Path(file_path).stem
 
     with open(file_path, "rb") as f:
-        name = Path(file_path).stem
 
         text_hdr = f.read(hdrlen["text_hdr"])
 
@@ -98,18 +99,19 @@ def sgy_input(file_path: Path) -> Dataset:
 
             traces.append(Trace(tr_hdr, tr_data))
 
-    return Dataset(name, text_hdr, byte_order, dt, numsmp, traces)
+    return Dataset(file_name, text_hdr, byte_order, dt, numsmp, traces)
 
 
-def sgy_output(dataset: Dataset, output_path: Path) -> bytes:
-    """Export dataset to SEG-Y file."""
+def sgy_output(dataset: Dataset, output_path: Path) -> None:
+    """Export dataset object to standart SEG-Y file."""
 
     with open(output_path, "wb") as f:
-        # headers
+        # export textual and binary headers:
         f.write(dataset.export_text_hdr())
-        f.write(dataset.get_bin_hdr())
+        f.write(dataset.export_bin_hdr())
 
-        # traces
+        # export trace headsers and seismic data:
         for trace in dataset.traces:
             f.write(trace.get_tr_hdr(dataset.byte_order))
             f.write(trace.get_tr_data(dataset.byte_order))
+

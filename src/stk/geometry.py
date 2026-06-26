@@ -1,16 +1,105 @@
 import os
-from math import hypot
+from math import hypot, floor
+from typing import SupportsFloat
+from functools import lru_cache
 
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import LineString
-
-import stk.utils as u
-from stk.config import proj_set
-from stk.io_data import sgy_input
+from pyproj import CRS, Transformer
 
 
-def get_geometry(dataset) -> tuple[float, float]:
+@lru_cache(maxsize=64)
+def _get_transformer_inverse(zone_number: int, south: bool) -> Transformer:
+    epsg = 32700 + zone_number if south else 32600 + zone_number
+
+    return Transformer.from_crs(
+        epsg,
+        4326,
+        always_xy=True,
+    )
+
+
+def utm_to_wgs84(x: float, y: float, zone: str) -> tuple[float, float]:
+    """Convert UTM coordinates to WGS84 (lat, lon - DD.DDDDDD)."""
+    if len(zone) < 2:
+        raise ValueError(f"Invalid UTM zone: {zone!r}")
+
+    zone_number = int(zone[:-1])
+    hemisphere = zone[-1].upper()
+
+    if hemisphere not in ("N", "S"):
+        raise ValueError(f"Zone must end with N or S, got: {zone!r}")
+
+    south = hemisphere == "S"
+
+    transformer = _get_transformer_inverse(zone_number, south)
+
+    lon, lat = transformer.transform(x, y)
+
+    return lat, lon
+
+
+@lru_cache(maxsize=64)
+def _get_transformer(zone_number: int, south: bool) -> Transformer:
+    epsg = 32700 + zone_number if south else 32600 + zone_number
+    return Transformer.from_crs("EPSG:4326", CRS.from_epsg(epsg), always_xy=True)
+
+
+def wgs84_to_utm(lat: float, lon: float, zone: str) -> tuple[float, float]:
+    """Convert WGS84 coordinates (DD.DDDDDD) to UTM."""
+    if len(zone) < 2:
+        raise ValueError(f"Invalid UTM zone: {zone!r}")
+
+    zone_number = int(zone[:-1])
+    hemisphere = zone[-1].upper()
+
+    if hemisphere not in ("N", "S"):
+        raise ValueError(f"Zone must end with N or S, got: {zone!r}")
+
+    south = hemisphere == "S"
+
+    transformer = _get_transformer(zone_number, south)
+
+    return transformer.transform(lon, lat)
+
+
+def nmea_to_decimal(value: SupportsFloat, hemisphere: str) -> float:
+    """Convert NMEA coordinate (DDMM.MMMMMM) to decimal degrees (DD.DDDDDD). """
+    value = float(value)
+
+    degrees = int(value // 100)
+    minutes = value - degrees * 100
+
+    decimal = degrees + minutes / 60
+
+    if hemisphere.upper() in ("S", "W"):
+        decimal = -decimal
+    elif hemisphere.upper() not in ("N", "E"):
+        raise ValueError(f"Invalid hemisphere: {hemisphere!r}")
+
+    return decimal
+
+
+def get_utm_zone(lat: float, lon: float) -> str:
+    """Return UTM zone (e.g. '35N') for WGS84 coordinates"""
+
+    if lat is None or lon is None:
+        raise ValueError("lat/lon cannot be None")
+
+    if not -80 <= lat <= 84:
+        raise ValueError("UTM is defined only between 80°S and 84°N.")
+
+    if not -180 <= lon <= 180:
+        raise ValueError("Longitude must be in range [-180, 180].")
+
+    zone = floor((lon + 180) / 6) + 1
+    hemisphere = "N" if lat >= 0 else "S"
+
+    return f"{zone}{hemisphere}"
+
+
+def get_geometry(dataset) -> list[tuple[float, float]]:
 
     coordinates = []
 
@@ -85,29 +174,3 @@ class TracksExporter:
 
         file_path = os.path.join(output_folder, dataset.name + ".csv")
         df.to_csv(file_path, index=False, encoding="utf-8")
-
-
-@u.timer
-def export_nav(folder_path=None, crs=proj_set["proj_crs"], csv=False):
-
-    if folder_path is None:
-        folder_path = u.get_folder()
-
-    TracksExport = TracksExporter(crs)
-
-    file_paths = u.get_paths(folder_path)
-    output_path = u.create_folder('output', folder_path)
-
-    for idx, file_path in enumerate(file_paths):
-        current_dataset = sgy_input(file_path)
-        TracksExport.add_dataset(current_dataset)
-        if csv:
-            TracksExport.export_csv(current_dataset, output_path)
-
-    TracksExport.export_gpkg(output_path)
-
-
-if __name__ == "__main__":
-    print("Please select folder with seg files", end="\n\n")
-    export_nav()
-    print(f"Done! Complited in {export_nav.elapsed_time:.3f} sec", end="\n\n")

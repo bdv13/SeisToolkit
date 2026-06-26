@@ -37,15 +37,15 @@ class Trace:
 
         return data.tobytes()
 
-    def zero_pad(self, num_samples: int, side: str ='end'):
+    def zero_pad(self, num_samples: int, side: str = "end"):
         """Add zero samples to trace data."""
 
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
-        if side == 'start':
+        if side == "start":
             self.data = np.pad(self.data, (num_samples, 0))
-        elif side == 'end':
+        elif side == "end":
             self.data = np.pad(self.data, (0, num_samples))
         else:
             raise ValueError("side must be 'start' or 'end'")
@@ -66,6 +66,7 @@ class Trace:
 
         self.numsmp = len(self.data)
 
+
 class Dataset:
     def __init__(self, name, text_hdr, byte_order, dt, numsmp, traces):
         self.name = name
@@ -80,7 +81,7 @@ class Dataset:
         """Return textual header in binary format."""
         return self.text_hdr
 
-    def get_bin_hdr(self, **kwargs):
+    def export_bin_hdr(self, **kwargs):
         """Return binary header in binary format."""
 
         bin_array = bytearray(hdrlen["bin_hdr"])
@@ -102,7 +103,7 @@ class Dataset:
 
         return bin_array
 
-    def zero_pad(self, num_samples: int, side: str ='end'):
+    def zero_pad(self, num_samples: int, side: str = "end"):
         """Add zero samples to all traces."""
 
         if num_samples < 0:
@@ -129,10 +130,10 @@ class Dataset:
 
         self.numsmp = self.traces[0].numsmp
 
-    def record_length(self, value: float, unit: str = 'ms'):
+    def record_length(self, value: float, unit: str = "ms"):
         """Set record length for all traces."""
 
-        if unit == 'ms':
+        if unit == "ms":
             target_samples = int(round(value * 1000 / self.dt))
         else:
             target_samples = int(value)
