@@ -1,11 +1,12 @@
-from pathlib import Path
 from datetime import date, datetime
+from pathlib import Path
 
 import stk.utils as u
-from stk.geometry import nmea_to_decimal, get_utm_zone, wgs84_to_utm
+from stk.geometry import get_utm_zone, nmea_to_decimal, wgs84_to_utm
 
 
 def parse_gga(packet):
+    """Parse an NMEA GGA packet into latitude, longitude, and time."""
     try:
         if packet[1] == "":
             return None
@@ -25,6 +26,7 @@ def parse_gga(packet):
 
 
 def parse_zda(packet):
+    """Parse an NMEA ZDA packet into a Python date object."""
     try:
         day = int(packet[2])
         month = int(packet[3])
@@ -35,17 +37,41 @@ def parse_zda(packet):
     except (IndexError, ValueError):
         return None
 
-@u.timer
-def main():
 
-    file_path = Path(u.get_file())
+@u.timer
+def proc_nmea_log(file_path=None):
+    """
+    Parse an NMEA log file and export decoded GPS/UTM data.
+
+    This function reads an input NMEA file selected by the user, parses
+    ZDA (date) and GGA (position) sentences, combines them into full
+    timestamps, converts coordinates to UTM, and writes the resulting
+    structured dataset into a text file.
+
+    The output file contains:
+        - UTC datetime
+        - year and Julian day
+        - time components (hour, minute, second)
+        - latitude and longitude (decimal degrees)
+        - UTM zone
+        - UTM coordinates (X, Y)
+
+      Processing logic:
+        - ZDA messages are used to update the current date context.
+        - GGA messages provide position and time-of-day.
+        - Only GGA records with a known date are exported.
+    """
+    if not file_path:
+        file_path = Path(u.select_file())
+
     output_path = file_path.parent / f"{file_path.stem}_parsed.txt"
 
     current_date = None
 
-    with open(file_path, "r", encoding="latin-1") as fin, \
-         open(output_path, "w", encoding="utf-8") as fout:
-
+    with (
+        open(file_path, "r", encoding="latin-1") as fin,
+        open(output_path, "w", encoding="utf-8") as fout,
+    ):
         fout.write("DATE TIME YEAR JD HOUR MIN SEC LAT LON UTM_ZONE X Y\n")
 
         for line in fin:
@@ -53,12 +79,12 @@ def main():
             if not line:
                 continue
 
-            packet = line.split(',')
+            packet = line.split(",")
 
             if not line.startswith("$"):
                 continue
 
-            msg_type = packet[0].split('*')[0][-3:]
+            msg_type = packet[0].split("*")[0][-3:]
 
             if msg_type == "ZDA":
                 dt = parse_zda(packet)
@@ -69,7 +95,6 @@ def main():
                 result = parse_gga(packet)
 
                 if result and current_date:
-
                     lat, lon, t = result
 
                     full_dt = datetime.combine(current_date, t)
@@ -102,5 +127,5 @@ def main():
 if __name__ == "__main__":
     print()
     print("Please select NMEA log file", end="\n\n")
-    main()
-    print(f"Done! Complited in {main.elapsed_time:.3f} sec", end="\n\n")
+    proc_nmea_log()
+    print(f"Done! Complited in {proc_nmea_log.elapsed_time:.3f} sec", end="\n\n")

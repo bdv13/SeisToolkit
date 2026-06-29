@@ -1,7 +1,4 @@
-proj_set = {
-    'proj_name': 'MyProject',
-    'proj_crs': 'EPSG:32636',
-}
+SV = 1500
 
 hdrlen = {
     'text_hdr': 3200,
@@ -157,4 +154,48 @@ log_dict = {
     'Length_km': 'line_len_km',
     'Mean_step_m': 'mean_step',
     'Delay': 'delay_flag'
+}
+
+EBCDIC_templ = {
+
+    'C01 PROJECT: ': '',
+    'C02 CLIENT: ': '',
+    'C03 CONTRACTOR: ': '',
+    'C04 VESSEL: ': '',
+    'C05 AREA: ': ' ',
+    'C06 SURVEY TYPE: ': '',
+    'C07 LINE: ': '',
+    'C08 JOBNO: ': '',
+    'C09 SURVEY DATE: ': '',
+    'C10 INSTRUMENT: ': '',
+    'C11 DOMINANT FREQUENCY: ': '',
+    'C12 BANDWITH: ': '',
+    'C14 SAMPLE INTERVAL: ': '',
+    'C15 SAMPLE RATE: ': '',
+    'C16 SAMPLE FORMAT: ': '',
+    'C17 MAP PROJECTION: ': '',
+    'C18 COORDINATES UNITS: ': '',
+    'C19 DOMAIN: ': '',
+    'C20 DATA: ': '',
+    'C21 SOUND VELOCITY: ': '',
+    'C22 DATUM ELEVATION: ': '',
+    'C23 ': '',
+    'C24 ': '----- TRACE HEADER LOCATIONS -----',
+    'C25 CDP: ': 'BYTES: 9-12',
+    'C26 SCALE FACTOR: ': 'BYTES: 71-72',
+    'C27 X COORDINATE: ': 'BYTES: 73-76',
+    'C28 Y COORDINATE: ': 'BYTES: 77-80',
+    'C29 WATER DEPTH (M): ': 'BYTES: 61-64',
+    'C30 NUMBER OF SAMPLE: ': 'BYTES: 115-116',
+    'C31 SAMPLE INTERVAL: ': 'BYTES: 117-118',
+    'C32 ': '',
+    'C33 ': '----- PROCESSING -----',
+    'C34 ': 'SOFTWARE: ',
+    'C35': '',
+    'C36': '',
+    'C37': '',
+    'C38': '',
+    'C39 ': 'SEG Y REV1',
+    'C40 ': 'END TEXTUAL HEADER',
+
 }

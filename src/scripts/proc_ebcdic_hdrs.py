@@ -1,25 +1,25 @@
 from pathlib import Path
 
-from stk.utils import get_folder
-from stk.headers import get_text_enc, format_text_hdr
+from stk.headers import format_text_hdr, get_text_enc
+from stk.utils import select_folder
 
 
 def process_ebcdic_hdrs(folder_path=None):
     """Convert exported EBCDIC header files into UTF-8 text files."""
 
     if not folder_path:
-        folder_path = Path(get_folder())
+        folder_path = Path(select_folder())
 
     output_folder = folder_path / "output"
     output_folder.mkdir(exist_ok=True)
 
     file_paths = [
-        f for f in folder_path.iterdir()
+        f
+        for f in folder_path.iterdir()
         if f.is_file() and f.name.lower().endswith(".ebcdic")
     ]
 
     for file_path in file_paths:
-
         with open(file_path, "rb") as f:
             text_hdr = f.read()
 
@@ -33,6 +33,6 @@ def process_ebcdic_hdrs(folder_path=None):
             f.write(text)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     process_ebcdic_hdrs()
-    print("Done!", end='\n')
+    print("Done!", end="\n")

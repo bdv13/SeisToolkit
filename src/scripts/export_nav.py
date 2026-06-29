@@ -1,19 +1,23 @@
 import stk.utils as u
 from stk.geometry import TracksExporter
-from stk.config import proj_set
 from stk.io_data import sgy_input
 
 
 @u.timer
-def export_nav(folder_path=None, crs=proj_set["proj_crs"], csv=False):
-
+def export_nav(
+    folder_path=None,
+    crs="EPSG:32635",
+    source_hdrs=("sou_x", "sou_y"),
+    csv=False
+):
+    """Export navigation data from SEG-Y files to GIS formats."""
     if folder_path is None:
-        folder_path = u.get_folder()
+        folder_path = u.select_folder()
 
-    TracksExport = TracksExporter(crs)
+    TracksExport = TracksExporter(crs, source_hdrs)
 
     file_paths = u.get_paths(folder_path)
-    output_path = u.create_folder('output', folder_path)
+    output_path = u.create_folder("output", folder_path)
 
     for idx, file_path in enumerate(file_paths):
         current_dataset = sgy_input(file_path)

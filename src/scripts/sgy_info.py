@@ -1,4 +1,5 @@
 import os
+
 import pandas as pd
 
 import stk.utils as u
@@ -8,6 +9,7 @@ from stk.io_data import sgy_input
 
 
 def delay_flag(dataset):
+    """Check whether any trace contains a delay (relative recording delay)."""
     delays = []
     for trace in dataset.traces:
         delays.append(trace.relrect)
@@ -17,7 +19,8 @@ def delay_flag(dataset):
         return True
 
 
-def linelen_maxstep(dataset):
+def compute_line_stats(dataset):
+    """Calculate line length and mean trace spacing for a dataset."""
     coordinates = get_geometry(dataset)
     cumdists, steps = compute_cumdist(coordinates)
     try:
@@ -30,12 +33,14 @@ def linelen_maxstep(dataset):
 
 
 def trace_enum(dataset, start_value=0):
+    """Compute sequential trace numbering range for a dataset."""
     trace_sol = start_value + 1
     trace_eol = start_value + len(dataset.traces)
     return trace_sol, trace_eol
 
 
 def create_log_file(path):
+    """Create an empty Excel log file for dataset information."""
     log_path = os.path.join(path, "Log.xlsx")
     df = pd.DataFrame(columns=list(log_dict.keys()))
     df.to_excel(log_path, index=False, engine="openpyxl")
@@ -43,6 +48,7 @@ def create_log_file(path):
 
 
 def write_log_file(log_file, log_path):
+    """Append a log record to an Excel log file."""
     log_df = pd.read_excel(log_path)
     row = pd.Series(log_file)
     log_df = pd.concat([log_df, pd.DataFrame([row])], ignore_index=True)
@@ -51,12 +57,35 @@ def write_log_file(log_file, log_path):
 
 @u.timer
 def info(folder_path=None):
+    """
+    Analyze SEG-Y files in a folder and write summary log information.
 
+    This function scans a directory for SEG-Y files, loads each dataset,
+    computes basic acquisition and geometry statistics, and writes the
+    results into a log file.
+
+    For each dataset, the following information is collected:
+    - line name
+    - file size (MB)
+    - number of traces
+    - FFID start/end range (continuous trace numbering)
+    - sample interval (ms)
+    - record length (ms)
+    - sampling frequency (Hz)
+    - byte order
+    - sample format
+    - line length (km)
+    - mean trace spacing (m)
+    - delay recording flag
+
+    The function creates an output folder and log file automatically
+    if not provided.
+    """
     if folder_path is None:
-        folder_path = u.get_folder()
+        folder_path = u.select_folder()
 
     file_paths = u.get_paths(folder_path, formats=(".sgy", ".segy"))
-    output_path = u.create_folder('output', folder_path)
+    output_path = u.create_folder("output", folder_path)
     log_path = create_log_file(output_path)
     log_file = log_dict.copy()
 
@@ -79,8 +108,8 @@ def info(folder_path=None):
         log_file["Sample_Freq_hz"] = 1_000_000 / dataset.dt
         log_file["Byte_order"] = dataset.byte_order
         log_file["Format"] = fmt_dict[dataset.fmt_code][0]
-        log_file["Length_km"] = linelen_maxstep(dataset)[0]
-        log_file["Mean_step_m"] = linelen_maxstep(dataset)[1]
+        log_file["Length_km"] = compute_line_stats(dataset)[0]
+        log_file["Mean_step_m"] = compute_line_stats(dataset)[1]
         log_file["Delay"] = delay_flag(dataset)
 
         write_log_file(log_file, log_path)

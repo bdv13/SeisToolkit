@@ -218,6 +218,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 # User-specific files
-tests/
 output/
-plans.txt
+tests/test_data/

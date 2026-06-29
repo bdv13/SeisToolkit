@@ -11,6 +11,7 @@ from pyproj import CRS, Transformer
 
 @lru_cache(maxsize=64)
 def _get_transformer_inverse(zone_number: int, south: bool) -> Transformer:
+    """Return a cached inverse coordinate transformer for UTM to WGS84."""
     epsg = 32700 + zone_number if south else 32600 + zone_number
 
     return Transformer.from_crs(
@@ -42,8 +43,13 @@ def utm_to_wgs84(x: float, y: float, zone: str) -> tuple[float, float]:
 
 @lru_cache(maxsize=64)
 def _get_transformer(zone_number: int, south: bool) -> Transformer:
+    """Return a cached transformer from WGS84 to UTM coordinates."""
     epsg = 32700 + zone_number if south else 32600 + zone_number
-    return Transformer.from_crs("EPSG:4326", CRS.from_epsg(epsg), always_xy=True)
+    return Transformer.from_crs(
+        "EPSG:4326",
+        CRS.from_epsg(epsg),
+        always_xy=True
+    )
 
 
 def wgs84_to_utm(lat: float, lon: float, zone: str) -> tuple[float, float]:
@@ -65,7 +71,7 @@ def wgs84_to_utm(lat: float, lon: float, zone: str) -> tuple[float, float]:
 
 
 def nmea_to_decimal(value: SupportsFloat, hemisphere: str) -> float:
-    """Convert NMEA coordinate (DDMM.MMMMMM) to decimal degrees (DD.DDDDDD). """
+    """Convert NMEA coordinate (DDMM.MMMMMM) to decimal degrees (DD.DDDDDD)."""
     value = float(value)
 
     degrees = int(value // 100)
@@ -83,7 +89,6 @@ def nmea_to_decimal(value: SupportsFloat, hemisphere: str) -> float:
 
 def get_utm_zone(lat: float, lon: float) -> str:
     """Return UTM zone (e.g. '35N') for WGS84 coordinates"""
-
     if lat is None or lon is None:
         raise ValueError("lat/lon cannot be None")
 
@@ -99,21 +104,34 @@ def get_utm_zone(lat: float, lon: float) -> str:
     return f"{zone}{hemisphere}"
 
 
-def get_geometry(dataset) -> list[tuple[float, float]]:
+def get_geometry(
+        dataset,
+        fields: tuple[str, str] = ("sou_x", "sou_y"),
+    ) -> list[tuple[float, float]]:
+    """Return scaled geometry coordinates."""
 
-    coordinates = []
+    x_field, y_field = fields
 
     raw_sac = dataset.traces[0].sac
 
-    sac = raw_sac if raw_sac > 0 else 1 / abs(raw_sac) if raw_sac < 0 else 1
-    for trace in dataset.traces:
-        coordinates.append((trace.sou_x * sac, trace.sou_y * sac))
+    if raw_sac > 0:
+        sac = raw_sac
+    elif raw_sac < 0:
+        sac = 1 / abs(raw_sac)
+    else:
+        sac = 1
 
-    return coordinates
+    return [
+        (
+            getattr(trace, x_field) * sac,
+            getattr(trace, y_field) * sac,
+        )
+        for trace in dataset.traces
+    ]
 
 
 def compute_cumdist(coordinates):
-
+    """Compute stepwise and cumulative distances between coordinates."""
     steps = []
     cumdists = [0]
 
@@ -132,27 +150,37 @@ def compute_cumdist(coordinates):
 
 
 class TracksExporter:
-    def __init__(self, crs):
+    """Utility class for exporting and processing seismic trace geometry."""
+
+    def __init__(self, crs, coord_fields=('sou_x', 'sou_y')):
         self.crs = crs
+        self.coord_fields = coord_fields
         self.lines = []
         self.names = []
 
     def add_dataset(self, dataset):
-        points = get_geometry(dataset)
+        """Add a dataset geometry to the exporter."""
+        points = get_geometry(dataset, self.coord_fields)
         self.lines.append(LineString(points))
         self.names.append(dataset.name)
 
     def to_gdf(self):
-        return gpd.GeoDataFrame({"Line": self.names}, geometry=self.lines, crs=self.crs)
+        """Convert stored line geometries to a GeoDataFrame."""
+        return gpd.GeoDataFrame(
+            {"Line": self.names},
+            geometry=self.lines,
+            crs=self.crs
+        )
 
     def export_gpkg(self, output_folder):
+        """Export stored track geometries to a GeoPackage file."""
         gdf = self.to_gdf()
         file_path = os.path.join(output_folder, "tracklines.gpkg")
         gdf.to_file(file_path, layer="tracklines", driver="GPKG")
 
     @staticmethod
     def export_csv(dataset, output_folder):
-
+        """Export dataset geometry and trace metadata to a CSV file."""
         coordinates = get_geometry(dataset)
         cumdists, steps = compute_cumdist(coordinates)
 

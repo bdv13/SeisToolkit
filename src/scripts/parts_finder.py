@@ -1,17 +1,18 @@
-import os
 import math
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+import os
 from pathlib import Path
+
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import pandas as pd
 from scipy.spatial import KDTree
 
 import stk.utils as u
-from stk.io_data import sgy_input
 from stk.geometry import get_geometry
+from stk.io_data import sgy_input
 
 
-def extract_nav(file_paths: Path, output_file: Path):
+def extract_nav(file_paths: list, output_file: Path):
 
     rows = []
 
@@ -23,12 +24,14 @@ def extract_nav(file_paths: Path, output_file: Path):
         for i, trace in enumerate(current_dataset.traces):
             x, y = coordinates[i]
 
-            rows.append({
-                "LINE": file_name,
-                "FFID": trace.ffid,
-                "SOU_X": x,
-                "SOU_Y": y,
-            })
+            rows.append(
+                {
+                    "LINE": file_name,
+                    "FFID": trace.ffid,
+                    "SOU_X": x,
+                    "SOU_Y": y,
+                }
+            )
 
     nav_df = pd.DataFrame(rows)
 
@@ -59,9 +62,7 @@ def find_parts(nav_file, res_file, tolerance=5):
         a = lines[name_a]
 
         distances, idxs = tree.query(
-            a["end"],
-            k=len(line_names),
-            distance_upper_bound=tolerance
+            a["end"], k=len(line_names), distance_upper_bound=tolerance
         )
 
         for dist, j in zip(distances, idxs):
@@ -74,12 +75,12 @@ def find_parts(nav_file, res_file, tolerance=5):
 
             d_forward = math.hypot(
                 a["end"][0] - lines[name_b]["start"][0],
-                a["end"][1] - lines[name_b]["start"][1]
+                a["end"][1] - lines[name_b]["start"][1],
             )
 
             d_backward = math.hypot(
                 a["start"][0] - lines[name_b]["end"][0],
-                a["start"][1] - lines[name_b]["end"][1]
+                a["start"][1] - lines[name_b]["end"][1],
             )
 
             if d_forward < d_backward and d_forward < tolerance:
@@ -125,10 +126,12 @@ def find_parts(nav_file, res_file, tolerance=5):
             line_df = nav_df[nav_df["LINE"] == line_name]
             plt.plot(line_df["SOU_X"], line_df["SOU_Y"], color=color, linewidth=1)
 
-    plt.legend(handles=[
-        mpatches.Patch(color='red', label='Connected lines (>1)'),
-        mpatches.Patch(color='blue', label='Single lines')
-    ])
+    plt.legend(
+        handles=[
+            mpatches.Patch(color="red", label="Connected lines (>1)"),
+            mpatches.Patch(color="blue", label="Single lines"),
+        ]
+    )
 
     plt.title(f"Lines grouped (Tolerance = {tolerance}m)")
     plt.xlabel("X")
@@ -142,10 +145,8 @@ def create_pathslist(prefix, res_file, group_folder, single_lines_file):
     single_lines = []
     group_counter = 0
 
-    with open(res_file, 'r', encoding='utf-8') as f:
-
+    with open(res_file, "r", encoding="utf-8") as f:
         for line in f:
-
             if not line.strip().startswith("Group"):
                 continue
 
@@ -183,13 +184,13 @@ def create_pathslist(prefix, res_file, group_folder, single_lines_file):
 @u.timer
 def main():
 
-    folder_path = u.get_folder()
-    file_paths = u.get_paths(folder_path, formats=('.sgy', 'segy'))
-    output_folder = u.create_folder('output', folder_path)
+    folder_path = u.select_folder()
+    file_paths = u.get_paths(folder_path, formats=(".sgy", "segy"))
+    output_folder = u.create_folder("output", folder_path)
 
     nav_file = output_folder / "fparts_nav.txt"
     res_file = output_folder / "fparts_res.txt"
-    group_folder = u.create_folder('groups', output_folder)
+    group_folder = u.create_folder("groups", output_folder)
     single_lines = output_folder / "fparts_single_lines.txt"
 
     extract_nav(file_paths, nav_file)

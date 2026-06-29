@@ -5,13 +5,14 @@ from stk.utils import pack
 
 
 class Trace:
+    """Represent a single seismic trace."""
+
     def __init__(self, tr_hdr, tr_data):
         self.__dict__.update({k.lower(): v for k, v in tr_hdr.items()})
         self.data = tr_data
 
-    def get_tr_hdr(self, byte_order=">"):
+    def export_tr_hdr(self, byte_order=">"):
         """Return trace header in binary format."""
-
         tr_array = bytearray(hdrlen["trace_hdr"])
 
         tr_hdr = {
@@ -25,9 +26,8 @@ class Trace:
 
         return tr_array
 
-    def get_tr_data(self, byte_order=">"):
+    def export_tr_data(self, byte_order=">"):
         """Return trace samples in IEEE float32 format."""
-
         data = np.asarray(self.data, dtype=np.float32)
 
         if byte_order == ">":
@@ -39,7 +39,6 @@ class Trace:
 
     def zero_pad(self, num_samples: int, side: str = "end"):
         """Add zero samples to trace data."""
-
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
@@ -54,7 +53,6 @@ class Trace:
 
     def clip(self, num_samples: int):
         """Remove samples from the end of trace."""
-
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
@@ -68,6 +66,8 @@ class Trace:
 
 
 class Dataset:
+    """Represent a SEG-Y dataset."""
+
     def __init__(self, name, text_hdr, byte_order, dt, numsmp, traces):
         self.name = name
         self.text_hdr = text_hdr
@@ -105,7 +105,6 @@ class Dataset:
 
     def zero_pad(self, num_samples: int, side: str = "end"):
         """Add zero samples to all traces."""
-
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
@@ -115,7 +114,7 @@ class Dataset:
         self.numsmp = self.traces[0].numsmp
 
     def clip(self, num_samples: int):
-
+        """Remove samples from the end of all traces."""
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
@@ -130,9 +129,14 @@ class Dataset:
 
         self.numsmp = self.traces[0].numsmp
 
+    def to_section(self, transpose: bool = True) -> np.ndarray:
+        """Return traces as a 2D NumPy array."""
+        section = np.stack([trace.data for trace in self.traces])
+
+        return section.T if transpose else section
+
     def record_length(self, value: float, unit: str = "ms"):
         """Set record length for all traces."""
-
         if unit == "ms":
             target_samples = int(round(value * 1000 / self.dt))
         else:
@@ -147,9 +151,11 @@ class Dataset:
             self.clip(self.numsmp - target_samples)
 
     def sort_traces(self, *headers: str, reverse: bool = False) -> None:
+        """Sort traces by one or more trace header fields."""
         keys = [h.lower() for h in headers]
 
         def key_fn(tr):
             return tuple(getattr(tr, h, 0) for h in keys)
 
         self.traces.sort(key=key_fn, reverse=reverse)
+

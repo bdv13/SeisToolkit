@@ -8,11 +8,7 @@ from stk.utils import unpack
 
 
 def get_byte_order(bin_hdr: bytes) -> str:
-    """
-    Determine SEG-Y byte order from format code.
-    Returns '>' for big-endian or '<' for little-endian.
-    """
-
+    """Determine SEG-Y byte order from format code."""
     code_be = unpack(">", "H", bin_hdr, (24, 26))
     code_le = unpack("<", "H", bin_hdr, (24, 26))
 
@@ -27,7 +23,6 @@ def get_byte_order(bin_hdr: bytes) -> str:
 
 def parse_hdrs(data: bytes, byte_order: str, hdr_dict: dict) -> dict:
     """Parse SEG-Y header bytes into a dictionary."""
-
     return {
         name: unpack(byte_order, fmt, data, byte_range)
         for name, (byte_range, fmt) in hdr_dict.items()
@@ -36,7 +31,6 @@ def parse_hdrs(data: bytes, byte_order: str, hdr_dict: dict) -> dict:
 
 def ibm_to_ieee(arr: np.ndarray) -> np.ndarray:
     """Convert IBM floating-point values to IEEE float32."""
-
     sign = (arr >> 31) & 0x01
     exponent = (arr >> 24) & 0x7F
     mantissa = arr & 0x00FFFFFF
@@ -49,7 +43,6 @@ def ibm_to_ieee(arr: np.ndarray) -> np.ndarray:
 
 def decode_trace(raw_tr: bytes, fmt_code: int, byte_order: str) -> np.ndarray:
     """Decode seismic trace samples to float32."""
-
     if fmt_code == 5:
         return np.frombuffer(raw_tr, dtype=byte_order + "f4")
     elif fmt_code == 2:
@@ -65,7 +58,6 @@ def decode_trace(raw_tr: bytes, fmt_code: int, byte_order: str) -> np.ndarray:
 
 def sgy_input(file_path: Path) -> Dataset:
     """Read a SEG-Y file and return a dataset object."""
-
     file_name = Path(file_path).stem
 
     with open(file_path, "rb") as f:
@@ -104,14 +96,11 @@ def sgy_input(file_path: Path) -> Dataset:
 
 def sgy_output(dataset: Dataset, output_path: Path) -> None:
     """Export dataset object to standart SEG-Y file."""
-
     with open(output_path, "wb") as f:
         # export textual and binary headers:
         f.write(dataset.export_text_hdr())
         f.write(dataset.export_bin_hdr())
-
         # export trace headsers and seismic data:
         for trace in dataset.traces:
-            f.write(trace.get_tr_hdr(dataset.byte_order))
-            f.write(trace.get_tr_data(dataset.byte_order))
-
+            f.write(trace.export_tr_hdr(dataset.byte_order))
+            f.write(trace.export_tr_data(dataset.byte_order))
