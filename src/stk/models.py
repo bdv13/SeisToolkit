@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import numpy as np
 
 from stk.config import bin_dict, hdrlen, tr_dict
@@ -63,6 +64,18 @@ class Trace:
             self.data = self.data[:-num_samples]
 
         self.numsmp = len(self.data)
+
+    def get_datetime(self):
+        """Return trace datetime object from headers."""
+        try:
+            return datetime(self.year, 1, 1) + timedelta(
+                days=self.day - 1,
+                hours=self.hour,
+                minutes=self.minute,
+                seconds=self.second
+            )
+        except Exception:
+            return datetime.min
 
 
 class Dataset:

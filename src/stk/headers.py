@@ -1,4 +1,4 @@
-from stk.config import hdrlen, bin_dict
+from stk.config import hdrlen, bin_dict, tr_dict
 from stk.utils import pack
 
 
@@ -76,12 +76,23 @@ def create_bin_hdr(byte_order='>', **kwargs) -> bytes:
 def hdr_enumerator(dataset, header: str, start: int = 1, step: int = 1):
     """Assign sequential values to a trace header field."""
     header = header.lower()
-
     if not hasattr(dataset.traces[0], header):
             raise ValueError(f"Unknown header: {header}")
-
     value = start
-
     for trace in dataset.traces:
         setattr(trace, header, value)
         value += step
+
+
+def export_hdrs(dataset, output_path, hdrs):
+    """Export dataset trace headers in txt file."""
+    for hdr in hdrs:
+        if hdr.upper() not in tr_dict:
+            raise ValueError(f"Unknown header {hdr}")
+    if len(dataset.traces) == 0:
+            raise ValueError("Empty dataset. No trace found!")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(" ".join([hdr.upper() for hdr in hdrs]) + "\n")
+        for trace in dataset.traces:
+            values = (str(trace.__dict__[hdr.lower()]) for hdr in hdrs)
+            f.write(" ".join(values) + "\n")

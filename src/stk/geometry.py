@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from math import hypot, floor
 from typing import SupportsFloat
 from functools import lru_cache
@@ -7,6 +8,8 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import LineString
 from pyproj import CRS, Transformer
+
+import stk.utils as u
 
 
 @lru_cache(maxsize=64)
@@ -202,3 +205,56 @@ class TracksExporter:
 
         file_path = os.path.join(output_folder, dataset.name + ".csv")
         df.to_csv(file_path, index=False, encoding="utf-8")
+
+
+def gpkg_to_txt(file_path, layer=None):
+    """Extract attribute table from gpkg file to txt file."""
+    if not file_path:
+        file_path = u.select_file()
+
+    gdf = gpd.read_file(file_path, layer=layer)
+
+    base_name = os.path.splitext(file_path)[0]
+    out_path = base_name + ".txt"
+
+    df = gdf.drop(columns="geometry", errors="ignore")
+    df.to_csv(out_path, sep=" ", index=False)
+    return
+
+
+def points_to_lines(group_column, gpkg_path=None, layer=None):
+    """Convert grouped points from a GPKG into LineString geometries."""
+    if not gpkg_path:
+        gpkg_path = u.select_file()
+
+    gpkg_path = Path(gpkg_path)
+
+    gdf = gpd.read_file(gpkg_path, layer=layer)
+
+    if isinstance(group_column, int):
+        group_column = gdf.columns[group_column]
+
+    lines = []
+
+    for group_id, group in gdf.groupby(group_column, sort=False):
+        if len(group) < 2:
+            continue
+
+        line = LineString(group.geometry.tolist())
+
+        lines.append({
+            group_column: group_id,
+            "geometry": line
+        })
+
+    lines_gdf = gpd.GeoDataFrame(
+        lines,
+        geometry="geometry",
+        crs=gdf.crs
+    )
+
+    output_path = gpkg_path.with_name(f"{gpkg_path.stem}_lines.gpkg")
+
+    lines_gdf.to_file(output_path, driver="GPKG")
+
+    return
