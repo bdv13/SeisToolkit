@@ -1,15 +1,14 @@
 import os
-from pathlib import Path
 from math import hypot, floor
 from typing import SupportsFloat
 from functools import lru_cache
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 from shapely.geometry import LineString
 from pyproj import CRS, Transformer
-
-import stk.utils as u
+from scipy.interpolate import interp1d
 
 
 @lru_cache(maxsize=64)
@@ -207,54 +206,42 @@ class TracksExporter:
         df.to_csv(file_path, index=False, encoding="utf-8")
 
 
-def gpkg_to_txt(file_path, layer=None):
-    """Extract attribute table from gpkg file to txt file."""
-    if not file_path:
-        file_path = u.select_file()
-
-    gdf = gpd.read_file(file_path, layer=layer)
-
-    base_name = os.path.splitext(file_path)[0]
-    out_path = base_name + ".txt"
-
-    df = gdf.drop(columns="geometry", errors="ignore")
-    df.to_csv(out_path, sep=" ", index=False)
-    return
+def remove_duplicates(data: list[tuple[float, float]]) -> None:
+    """Mark consecutive duplicate navigation points as (None, None)."""
+    prev = data[0]
+    for i in range(1, len(data)):
+        if data[i] == prev:
+            data[i] = (None, None)
+        else:
+            prev = data[i]
 
 
-def points_to_lines(group_column, gpkg_path=None, layer=None):
-    """Convert grouped points from a GPKG into LineString geometries."""
-    if not gpkg_path:
-        gpkg_path = u.select_file()
+def linear_interp(data: list[tuple[float, float]], rouding=2) -> None:
+    """Linearly interpolate 2D navigation track in-place."""
 
-    gpkg_path = Path(gpkg_path)
+    def interp(v):
+        return interp1d(
+            t[mask],
+            v[mask],
+            kind="linear",
+            bounds_error=False,
+            fill_value="extrapolate"
+        )(t)
 
-    gdf = gpd.read_file(gpkg_path, layer=layer)
+    t = np.arange(len(data))
 
-    if isinstance(group_column, int):
-        group_column = gdf.columns[group_column]
-
-    lines = []
-
-    for group_id, group in gdf.groupby(group_column, sort=False):
-        if len(group) < 2:
-            continue
-
-        line = LineString(group.geometry.tolist())
-
-        lines.append({
-            group_column: group_id,
-            "geometry": line
-        })
-
-    lines_gdf = gpd.GeoDataFrame(
-        lines,
-        geometry="geometry",
-        crs=gdf.crs
+    arr = np.array(
+        [(np.nan, np.nan) if p is None else p for p in data], dtype=float
     )
 
-    output_path = gpkg_path.with_name(f"{gpkg_path.stem}_lines.gpkg")
+    mask = ~np.isnan(arr).any(axis=1)
+    if mask.sum() < 2:
+        raise ValueError("Not enough points for interpolation")
 
-    lines_gdf.to_file(output_path, driver="GPKG")
+    arr[:, 0] = interp(arr[:, 0])
+    arr[:, 1] = interp(arr[:, 1])
 
-    return
+    for i in range(len(data)):
+        data[i] = (
+            round(float(arr[i, 0]), rouding), round(float(arr[i, 1]), rouding))
+

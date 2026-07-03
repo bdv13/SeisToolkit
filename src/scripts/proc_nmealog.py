@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from pathlib import Path
 
 import stk.utils as u
 from stk.geometry import get_utm_zone, nmea_to_decimal, wgs84_to_utm
@@ -62,7 +61,7 @@ def proc_nmea_log(file_path=None):
         - Only GGA records with a known date are exported.
     """
     if not file_path:
-        file_path = Path(u.select_file())
+        file_path = u.select_file()
 
     output_path = file_path.parent / f"{file_path.stem}_parsed.txt"
 

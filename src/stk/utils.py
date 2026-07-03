@@ -1,16 +1,15 @@
 import shutil
 import struct
-import sys
 import time
 import tkinter as tk
 from functools import wraps
 from pathlib import Path
 from tkinter import filedialog
-from typing import Any
+from typing import Any, Literal
 
 
-def select_file() -> str | None:
-    """Select file. Returns folder path as str."""
+def select_file() -> Path | None:
+    """Select file. Returns file path."""
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
@@ -21,15 +20,13 @@ def select_file() -> str | None:
 
     if not file_path:
         print("File is not selected!", end="\n")
-        sys.exit()
-        return None
+        return
 
-    print("Selected file: ", file_path, end="\n\n")
-    return file_path
+    return Path(file_path)
 
 
-def select_folder() -> str | None:
-    """Select folder. Returns file path as str"""
+def select_folder() -> Path | None:
+    """Select folder. Returns folder path."""
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
@@ -37,22 +34,23 @@ def select_folder() -> str | None:
     root.destroy()
 
     if not folder_path:
-        print("Folder is not selected!", end="\n\n")
-        sys.exit()
-        return None
+        return
 
-    print("Selected folder: ", folder_path, end="\n\n")
-    return folder_path
+    return Path(folder_path)
 
 
 def create_folder(folder_name: str, path: Path) -> Path:
-    """Create folder in selected dirrectory."""
-    folder_path = Path(path) / folder_name
+    """Create folder in selected directory and return it path."""
+    folder_path = path / folder_name
     folder_path.mkdir(parents=True, exist_ok=True)
     return folder_path
 
 
-def get_paths(folder_path: Path, formats=(".sgy", ".segy"), export=False):
+def get_paths(
+        folder_path: Path,
+        formats: tuple[str, ...] = (".sgy", ".segy"),
+        export: bool = False
+) -> list[Path] | None:
     """Collect file paths with specified extensions."""
     folder = Path(folder_path)
     file_paths = []
@@ -62,10 +60,7 @@ def get_paths(folder_path: Path, formats=(".sgy", ".segy"), export=False):
 
     if not file_paths:
         print("No files found!", end="\n\n")
-        sys.exit()
-        return None
-
-    print(f"Number of files found: {len(file_paths)}", end="\n\n")
+        return
 
     if export:
         output_file = folder / "file_paths.txt"
@@ -74,15 +69,12 @@ def get_paths(folder_path: Path, formats=(".sgy", ".segy"), export=False):
             "\n".join(str(path) for path in file_paths), encoding="utf-8"
         )
 
-        print(f"Path list exported to:\n{output_file}\n")
-
     return file_paths
 
 
-def get_size_mb(file_path):
+def get_size_mb(file_path: Path) -> float:
     """Get file size in mb."""
-    size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
-    return size_mb
+    return file_path.stat().st_size / 1024**2
 
 
 def pack(fmt: str, hdr: bytearray, offset: int, value: Any) -> None:
@@ -90,16 +82,20 @@ def pack(fmt: str, hdr: bytearray, offset: int, value: Any) -> None:
     struct.pack_into(fmt, hdr, offset, value)
 
 
-def unpack(byte_order: str, fmt: str, data: bytes, byte_range: tuple[int, int]) -> Any:
+def unpack(
+        byte_order: str,
+        fmt: str, data: bytes,
+        byte_range: tuple[int, int]
+) -> Any:
     """Extract and unpack a value from a byte sequence."""
     start, end = byte_range
     return struct.unpack(byte_order + fmt, data[start:end])[0]
 
 
-def separate_files(operation="copy"):
+def separate_files(operation: Literal["copy", "move"] = "copy"):
     """Copy or move files listed in a text file to a separate folder."""
-    folder_path = Path(select_folder())
-    files_list = Path(select_file())
+    folder_path = select_folder()
+    files_list = select_file()
 
     output_folder = create_folder("separated_files", folder_path)
 
@@ -119,17 +115,15 @@ def separate_files(operation="copy"):
         if operation == "copy":
             shutil.copy2(source_file, destination_file)
 
-        elif operation == "cut":
+        elif operation == "move":
             shutil.move(source_file, destination_file)
 
         else:
             raise ValueError("Unknown command!")
 
 
-def delete(path):
+def delete(path: Path) -> None:
     """Delete a file or directory (recursively)."""
-    path = Path(path)
-
     if not path.exists():
         raise FileNotFoundError(f"Path does not exist: {path}")
 
@@ -142,8 +136,7 @@ def delete(path):
 
 
 def timer(func):
-    """Estimate fuction time in seconds."""
-
+    """Estimate function execution time."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
@@ -151,6 +144,5 @@ def timer(func):
         end = time.perf_counter()
         wrapper.elapsed_time = end - start
         return result
-
     wrapper.elapsed_time = 0
     return wrapper
