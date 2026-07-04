@@ -110,23 +110,12 @@ def get_geometry(
         dataset,
         fields: tuple[str, str] = ("sou_x", "sou_y"),
     ) -> list[tuple[float, float]]:
-    """Return scaled geometry coordinates."""
-
+    """Return geometry coordinates."""
     x_field, y_field = fields
-
-    raw_sac = dataset.traces[0].sac
-
-    if raw_sac > 0:
-        sac = raw_sac
-    elif raw_sac < 0:
-        sac = 1 / abs(raw_sac)
-    else:
-        sac = 1
-
     return [
         (
-            getattr(trace, x_field) * sac,
-            getattr(trace, y_field) * sac,
+            getattr(trace, x_field),
+            getattr(trace, y_field)
         )
         for trace in dataset.traces
     ]

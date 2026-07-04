@@ -36,20 +36,13 @@ def proc_flow():
         hdr_averager(seismic_line, 'SOU_X', 15)
         hdr_averager(seismic_line, 'SOU_Y', 15)
 
-        for trace in seismic_line.traces:
-            trace.sac = -100
-            trace.sou_x = int(trace.sou_x * 100)
-            trace.sou_y = int(trace.sou_y * 100)
-            trace.rec_x, trace.rec_y = trace.sou_x, trace.sou_y
-            trace.cdp_x, trace.cdp_y = trace.sou_x, trace.sou_y
-
         seismic_line.sort_traces("CDP")
 
         # ----- END of Processing Block -----
 
         # Export data:
         output_path = output_dir / f'{seismic_line.name}.sgy'
-        sgy_output(seismic_line, output_path)
+        sgy_output(seismic_line, output_path, sac=-100, saed=-100)
 
         print(f"{seismic_line.name} is processed!")
 

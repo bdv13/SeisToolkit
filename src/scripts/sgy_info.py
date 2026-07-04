@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 import stk.utils as u
-from stk.config import fmt_dict, log_dict
+from stk.config import FMT_DICT, LOG_DICT
 from stk.geometry import compute_cumdist, get_geometry
 from stk.io_data import sgy_input
 
@@ -42,7 +42,7 @@ def trace_enum(dataset, start_value=0):
 def create_log_file(path):
     """Create an empty Excel log file for dataset information."""
     log_path = os.path.join(path, "Log.xlsx")
-    df = pd.DataFrame(columns=list(log_dict.keys()))
+    df = pd.DataFrame(columns=list(LOG_DICT.keys()))
     df.to_excel(log_path, index=False, engine="openpyxl")
     return log_path
 
@@ -87,7 +87,7 @@ def info(folder_path=None):
     file_paths = u.get_paths(folder_path, formats=(".sgy", ".segy"))
     output_path = u.create_folder("output", folder_path)
     log_path = create_log_file(output_path)
-    log_file = log_dict.copy()
+    log_file = LOG_DICT.copy()
 
     current_trace = 0
 
@@ -107,7 +107,7 @@ def info(folder_path=None):
         log_file["Length_ms"] = dataset.dt * dataset.numsmp / 1000
         log_file["Sample_Freq_hz"] = 1_000_000 / dataset.dt
         log_file["Byte_order"] = dataset.byte_order
-        log_file["Format"] = fmt_dict[dataset.fmt_code][0]
+        log_file["Format"] = FMT_DICT[dataset.fmt_code][0]
         log_file["Length_km"] = compute_line_stats(dataset)[0]
         log_file["Mean_step_m"] = compute_line_stats(dataset)[1]
         log_file["Delay"] = delay_flag(dataset)

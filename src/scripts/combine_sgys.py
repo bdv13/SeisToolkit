@@ -79,15 +79,14 @@ def main():
 
         combined_dataset.sort_traces("trc_type")
 
-        for trace in combined_dataset.traces:
-            trace.trc_type = 0
+        combined_dataset.set_hdr('TRC_TYPE', 0)
 
         hdr_enumerator(combined_dataset, "TRACENO")
         hdr_enumerator(combined_dataset, "FFID")
         hdr_enumerator(combined_dataset, "SOURCE")
 
         output_path = output_folder / f"Line_{group_number + 1}.sgy"
-        sgy_output(combined_dataset, output_path)
+        sgy_output(combined_dataset, output_path, sac=-100, saed=-100)
 
         print(f"Group {group_number + 1} exported successfully!")
 

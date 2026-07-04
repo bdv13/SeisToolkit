@@ -1,6 +1,6 @@
 import numpy as np
 
-from stk.config import bin_dict, hdrlen, tr_dict
+from stk.config import BIN_DICT, HDRLEN, TR_DICT
 from stk.utils import pack
 
 
@@ -8,6 +8,7 @@ def get_text_enc(data: bytes) -> str:
     """
     Detect whether SEG-Y text header is encoded in ASCII or EBCDIC (cp500).
     """
+
     def score(s: str) -> float:
         if not s:
             return 0.0
@@ -43,16 +44,16 @@ def create_text_hdr(text: str | None = None, encoding: str = "cp500") -> bytes:
 def create_bin_hdr(byte_order=">", **kwargs) -> bytes:
     """Create SEG-Y binary header as 400 bytes."""
     for key in kwargs:
-        if key not in bin_dict:
+        if key not in BIN_DICT:
             raise KeyError(f"Unknown binary header field: {key}")
 
-    bin_array = bytearray(hdrlen["bin_hdr"])
+    bin_array = bytearray(HDRLEN["bin_hdr"])
 
-    bin_hdr = {key: 0 for key in bin_dict}
+    bin_hdr = {key: 0 for key in BIN_DICT}
     bin_hdr.update(kwargs)
 
     for parameter, value in bin_hdr.items():
-        (offset, _), fmt = bin_dict[parameter]
+        (offset, _), fmt = BIN_DICT[parameter]
 
         pack(byte_order + fmt, bin_array, offset, value)
 
@@ -82,10 +83,7 @@ def hdr_averager(dataset, hdr: str, window: int) -> None:
     if not hasattr(dataset.traces[0], hdr):
         raise ValueError(f"Unknown header: {hdr}")
 
-    values = np.array(
-        [getattr(trace, hdr) for trace in dataset.traces],
-        dtype=float
-    )
+    values = np.array([getattr(trace, hdr) for trace in dataset.traces], dtype=float)
 
     pad = window // 2
     padded = np.pad(values, (pad, pad), mode="edge")
@@ -97,10 +95,10 @@ def hdr_averager(dataset, hdr: str, window: int) -> None:
         setattr(trace, hdr, value)
 
 
-def hdrs_export(dataset, output_path, hdrs) -> None:
+def hdrs_export(dataset, output_path, hdrs: tuple) -> None:
     """Export dataset trace headers in txt file."""
     for hdr in hdrs:
-        if hdr.upper() not in tr_dict:
+        if hdr.upper() not in TR_DICT:
             raise ValueError(f"Unknown header {hdr}")
     if len(dataset.traces) == 0:
         raise ValueError("Empty dataset. No trace found!")

@@ -1,81 +1,23 @@
 from datetime import datetime, timedelta
+
 import numpy as np
 
-from stk.config import bin_dict, hdrlen, tr_dict
+from stk.config import BIN_DICT, HDRLEN, SCALED_HDRS, TR_DICT
 from stk.utils import pack
 
+ELEV_COORD_PRECISION = 8
 
-class Trace:
-    """Represent a single seismic trace."""
 
-    def __init__(self, tr_hdr, tr_data):
-        self.__dict__.update({k.lower(): v for k, v in tr_hdr.items()})
-        self.data = tr_data
+def _round(value: float, prec: int = ELEV_COORD_PRECISION) -> float:
+    return round(value, prec)
 
-    def export_tr_hdr(self, byte_order=">"):
-        """Return trace header in binary format."""
-        tr_array = bytearray(hdrlen["trace_hdr"])
 
-        tr_hdr = {
-            parameter: getattr(self, parameter.lower(), 0) for parameter in tr_dict
-        }
-
-        for parameter, value in tr_hdr.items():
-            (offset, _), fmt = tr_dict[parameter]
-
-            pack(byte_order + fmt, tr_array, offset, value)
-
-        return tr_array
-
-    def export_tr_data(self, byte_order=">"):
-        """Return trace samples in IEEE float32 format."""
-        data = np.asarray(self.data, dtype=np.float32)
-
-        if byte_order == ">":
-            data = data.astype(">f4", copy=False)
-        elif byte_order == "<":
-            data = data.astype("<f4", copy=False)
-
-        return data.tobytes()
-
-    def zero_pad(self, num_samples: int, side: str = "end"):
-        """Add zero samples to trace data."""
-        if num_samples < 0:
-            raise ValueError("num_samples must be >= 0")
-
-        if side == "start":
-            self.data = np.pad(self.data, (num_samples, 0))
-        elif side == "end":
-            self.data = np.pad(self.data, (0, num_samples))
-        else:
-            raise ValueError("side must be 'start' or 'end'")
-
-        self.numsmp = len(self.data)
-
-    def clip(self, num_samples: int):
-        """Remove samples from the end of trace."""
-        if num_samples < 0:
-            raise ValueError("num_samples must be >= 0")
-
-        if num_samples > len(self.data):
-            raise ValueError("num_samples exceeds trace length")
-
-        if num_samples:
-            self.data = self.data[:-num_samples]
-
-        self.numsmp = len(self.data)
-
-    def get_datetime(self):
-        """Return trace datetime object from headers."""
-        try:
-            return datetime(self.year, 1, 1) + timedelta(
-                days=self.day - 1,
-                hours=self.hour,
-                minutes=self.minute,
-                seconds=self.second
-            )
-        except Exception:
-            return datetime.min
+def _scalar(value: int) -> float:
+    if value > 0:
+        return value
+    if value < 0:
+        return 1 / abs(value)
+    return 1
 
 
 class Dataset:
@@ -90,6 +32,38 @@ class Dataset:
         self.fmt_code = 5
         self.traces = traces
 
+    def norm_hdrs(self) -> None:
+        """Apply SAC and SAED to coordinates and elevations."""
+        for trace in self.traces:
+            for scale_hdr, hdrs in SCALED_HDRS.items():
+
+                raw = getattr(trace, scale_hdr)
+                coeff = _scalar(raw)
+
+                for hdr in hdrs:
+                    value = getattr(trace, hdr)
+                    scaled = value * coeff
+                    setattr(trace, hdr, _round(scaled))
+
+                setattr(trace, scale_hdr, 1)
+
+    def denorm_hdrs(self, sac: int = 1, saed: int = 1) -> None:
+        """Prepare coordinates and elevations for SEG-Y export."""
+        coeffs = {
+            "sac": (sac, _scalar(sac)),
+            "saed": (saed, _scalar(saed)),
+        }
+
+        for trace in self.traces:
+            for scale_hdr, hdrs in SCALED_HDRS.items():
+                raw_coeff, coeff = coeffs[scale_hdr]
+
+                for hdr in hdrs:
+                    value = getattr(trace, hdr) / coeff
+                    setattr(trace, hdr, int(round(value)))
+
+                setattr(trace, scale_hdr, raw_coeff)
+
     def export_text_hdr(self):
         """Return textual header in binary format."""
         return self.text_hdr
@@ -97,24 +71,34 @@ class Dataset:
     def export_bin_hdr(self, **kwargs):
         """Return binary header in binary format."""
 
-        bin_array = bytearray(hdrlen["bin_hdr"])
+        bin_array = bytearray(HDRLEN["bin_hdr"])
 
         bin_hdr = {
-            parameter: getattr(self, parameter.lower(), 0) for parameter in bin_dict
+            parameter: getattr(self, parameter.lower(), 0) for parameter in BIN_DICT
         }
 
         for key in kwargs:
-            if key not in bin_dict:
+            if key not in BIN_DICT:
                 raise KeyError(f"Unknown binary header field: {key}")
 
         bin_hdr.update(kwargs)
 
         for parameter, value in bin_hdr.items():
-            (offset, _), fmt = bin_dict[parameter]
+            (offset, _), fmt = BIN_DICT[parameter]
 
             pack(self.byte_order + fmt, bin_array, offset, value)
 
         return bin_array
+
+    def set_hdr(self, hdr: str, value: float) -> None:
+        """Set header value for all traces in dataset."""
+        hdr = hdr.lower()
+
+        if hdr not in TR_DICT:
+            raise ValueError(f"Unknown header {hdr}")
+
+        for trace in self.traces:
+            trace.hdr = value
 
     def zero_pad(self, num_samples: int, side: str = "end"):
         """Add zero samples to all traces."""
@@ -172,3 +156,75 @@ class Dataset:
 
         self.traces.sort(key=key_fn, reverse=reverse)
 
+
+class Trace:
+    """Represent a single seismic trace."""
+
+    def __init__(self, tr_hdr, tr_data):
+        self.__dict__.update({k.lower(): v for k, v in tr_hdr.items()})
+        self.data = tr_data
+
+    def export_tr_hdr(self, byte_order=">"):
+        """Return trace header in binary format."""
+        tr_array = bytearray(HDRLEN["trace_hdr"])
+
+        tr_hdr = {
+            parameter: getattr(self, parameter.lower(), 0) for parameter in TR_DICT
+        }
+
+        for parameter, value in tr_hdr.items():
+            (offset, _), fmt = TR_DICT[parameter]
+
+            pack(byte_order + fmt, tr_array, offset, value)
+
+        return tr_array
+
+    def export_tr_data(self, byte_order=">"):
+        """Return trace samples in IEEE float32 format."""
+        data = np.asarray(self.data, dtype=np.float32)
+
+        if byte_order == ">":
+            data = data.astype(">f4", copy=False)
+        elif byte_order == "<":
+            data = data.astype("<f4", copy=False)
+
+        return data.tobytes()
+
+    def zero_pad(self, num_samples: int, side: str = "end"):
+        """Add zero samples to trace data."""
+        if num_samples < 0:
+            raise ValueError("num_samples must be >= 0")
+
+        if side == "start":
+            self.data = np.pad(self.data, (num_samples, 0))
+        elif side == "end":
+            self.data = np.pad(self.data, (0, num_samples))
+        else:
+            raise ValueError("side must be 'start' or 'end'")
+
+        self.numsmp = len(self.data)
+
+    def clip(self, num_samples: int):
+        """Remove samples from the end of trace."""
+        if num_samples < 0:
+            raise ValueError("num_samples must be >= 0")
+
+        if num_samples > len(self.data):
+            raise ValueError("num_samples exceeds trace length")
+
+        if num_samples:
+            self.data = self.data[:-num_samples]
+
+        self.numsmp = len(self.data)
+
+    def get_datetime(self):
+        """Return trace datetime object from headers."""
+        try:
+            return datetime(self.year, 1, 1) + timedelta(
+                days=self.day - 1,
+                hours=self.hour,
+                minutes=self.minute,
+                seconds=self.second,
+            )
+        except Exception:
+            return datetime.min

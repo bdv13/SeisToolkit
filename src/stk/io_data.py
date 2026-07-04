@@ -2,9 +2,13 @@ from pathlib import Path
 
 import numpy as np
 
-from stk.config import bin_dict, fmt_dict, hdrlen, tr_dict
+from stk.config import BIN_DICT, FMT_DICT, TR_DICT
 from stk.models import Dataset, Trace
 from stk.utils import unpack
+
+TEXT_HDR_LEN = 3200
+BIN_HDR_LEN = 400
+TR_HDR_LEN = 240
 
 
 def get_byte_order(bin_hdr: bytes) -> str:
@@ -61,28 +65,34 @@ def sgy_input(file_path: Path) -> Dataset:
     file_name = Path(file_path).stem
 
     with open(file_path, "rb") as f:
+        # read textual reader:
+        text_hdr = f.read(TEXT_HDR_LEN)
 
-        text_hdr = f.read(hdrlen["text_hdr"])
-
-        raw_bin_hdr = f.read(hdrlen["bin_hdr"])
+        # read binary header:
+        raw_bin_hdr = f.read(BIN_HDR_LEN)
         byte_order = get_byte_order(raw_bin_hdr)
-        bin_hdr = parse_hdrs(raw_bin_hdr, byte_order, bin_dict)
+        bin_hdr = parse_hdrs(raw_bin_hdr, byte_order, BIN_DICT)
 
         fmt_code = bin_hdr["FMT_CODE"]
-        if fmt_code not in fmt_dict:
+
+        if fmt_code not in FMT_DICT:
             raise ValueError(f"Unsupported SEG-Y format code: {fmt_code}")
-        bps = fmt_dict[fmt_code][1]
+
+        bps = FMT_DICT[fmt_code][1]
 
         dt = bin_hdr["dt"]
         numsmp = bin_hdr["NUMSMP"]
 
+        # read trace data -> Trace objects:
         traces = []
         while True:
-            raw_tr_hdr = f.read(hdrlen["trace_hdr"])
-            if len(raw_tr_hdr) < hdrlen["trace_hdr"]:
+            # read trace headers:
+            raw_tr_hdr = f.read(TR_HDR_LEN)
+            if len(raw_tr_hdr) < TR_HDR_LEN:
                 break
-            tr_hdr = parse_hdrs(raw_tr_hdr, byte_order, tr_dict)
+            tr_hdr = parse_hdrs(raw_tr_hdr, byte_order, TR_DICT)
 
+            # read trace data:
             numsmp = tr_hdr["NUMSMP"]
             raw_data = f.read(bps * numsmp)
             if len(raw_data) < bps * numsmp:
@@ -91,16 +101,30 @@ def sgy_input(file_path: Path) -> Dataset:
 
             traces.append(Trace(tr_hdr, tr_data))
 
-    return Dataset(file_name, text_hdr, byte_order, dt, numsmp, traces)
+        dataset = Dataset(file_name, text_hdr, byte_order, dt, numsmp, traces)
+        dataset.norm_hdrs()
+
+    return dataset
 
 
-def sgy_output(dataset: Dataset, output_path: Path) -> None:
-    """Export dataset object to standart SEG-Y file."""
-    with open(output_path, "wb") as f:
-        # export textual and binary headers:
-        f.write(dataset.export_text_hdr())
-        f.write(dataset.export_bin_hdr())
-        # export trace headsers and seismic data:
-        for trace in dataset.traces:
-            f.write(trace.export_tr_hdr(dataset.byte_order))
-            f.write(trace.export_tr_data(dataset.byte_order))
+def sgy_output(
+        dataset: Dataset,
+        output_path: Path,
+        sac: int = 1,
+        saed: int = 1
+) -> None:
+    """Export dataset object to standard SEG-Y file."""
+
+    dataset.denorm_hdrs(sac=sac, saed=saed)
+
+    try:
+        with open(output_path, "wb") as f:
+            f.write(dataset.export_text_hdr())
+            f.write(dataset.export_bin_hdr())
+
+            for trace in dataset.traces:
+                f.write(trace.export_tr_hdr(dataset.byte_order))
+                f.write(trace.export_tr_data(dataset.byte_order))
+
+    finally:
+        dataset.norm_hdrs()
