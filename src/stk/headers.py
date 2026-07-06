@@ -1,3 +1,6 @@
+import csv
+from pathlib import Path
+
 import numpy as np
 
 from stk.config import BIN_DICT, HDRLEN, TR_DICT
@@ -100,10 +103,70 @@ def hdrs_export(dataset, output_path, hdrs: tuple) -> None:
     for hdr in hdrs:
         if hdr.upper() not in TR_DICT:
             raise ValueError(f"Unknown header {hdr}")
+
     if len(dataset.traces) == 0:
         raise ValueError("Empty dataset. No trace found!")
+
     with open(output_path, "w", encoding="utf-8") as f:
+
         f.write(" ".join([hdr.upper() for hdr in hdrs]) + "\n")
+
         for trace in dataset.traces:
             values = (str(trace.__dict__[hdr.lower()]) for hdr in hdrs)
             f.write(" ".join(values) + "\n")
+
+
+def hdrs_import(
+        dataset,
+        file_path: Path,
+        headers: tuple[str],
+        columns: tuple[int],
+        match_header: str ='FFID',
+        match_column: int = 0,
+        cols_separator: str = ' '
+) -> None:
+    """Insert data from txt file into trace headers."""
+    if not dataset.traces:
+        raise ValueError("Dataset contains no traces.")
+
+    if len(headers) != len(columns):
+        raise ValueError("Amount of headers and columns must be equal!")
+
+    for hdr in headers:
+        if not hasattr(dataset.traces[0], hdr.lower()):
+            raise AttributeError(f"Traces don't have this header {hdr}.")
+
+    if match_header.upper() not in TR_DICT:
+        raise AttributeError(f"Unknown match header {match_header}!")
+
+    match_header = match_header.lower()
+    data = {}
+
+    invalid_lines = 0
+    with open(file_path, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f, delimiter=cols_separator, skipinitialspace=True)
+
+        for line in reader:
+            try:
+                values = [float(line[col]) for col in columns]
+                data[int(line[match_column])] = values
+            except (ValueError, IndexError):
+                invalid_lines += 1
+
+    missing = 0
+    for trace in dataset.traces:
+        key = getattr(trace, match_header)
+        values = data.get(key)
+
+        if values is None:
+            missing += 1
+            continue
+
+        for hdr, value in zip(headers, values):
+            setattr(trace, hdr.lower(), value)
+
+    if invalid_lines:
+        print(f"Skipped {invalid_lines} invalid input lines.")
+
+    if missing:
+        print(f"{missing} traces were not matched by {match_header}.")

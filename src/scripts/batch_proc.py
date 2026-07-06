@@ -21,7 +21,6 @@ def proc_flow():
 
         hdr_enumerator(seismic_line, 'TRACENO')
         hdr_enumerator(seismic_line, 'FFID')
-        hdr_enumerator(seismic_line, 'SOURCE')
         hdr_enumerator(seismic_line, 'CDP')
 
         line_geom = get_geometry(seismic_line)
@@ -33,8 +32,8 @@ def proc_flow():
             trace.rec_x, trace.rec_y = coordinate
             trace.cdp_x, trace.cdp_y = coordinate
 
-        hdr_averager(seismic_line, 'SOU_X', 15)
-        hdr_averager(seismic_line, 'SOU_Y', 15)
+        hdr_averager(seismic_line, 'SOU_X', 25)
+        hdr_averager(seismic_line, 'SOU_Y', 25)
 
         seismic_line.sort_traces("CDP")
 

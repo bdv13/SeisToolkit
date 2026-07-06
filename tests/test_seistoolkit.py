@@ -42,5 +42,3 @@ def test_export_hdrs(tmp_path, sgy_file):
     hdrs_export(dataset, output_path, ["FFID", "SOU_X", "SOU_Y", "YEAR", "DAY"])
 
     assert output_path.exists()
-
-

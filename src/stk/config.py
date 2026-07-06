@@ -1,5 +1,3 @@
-SV = 1500
-
 HDRLEN = {"text_hdr": 3200, "bin_hdr": 400, "trace_hdr": 240}
 
 BIN_DICT = {
