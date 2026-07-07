@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -23,7 +24,15 @@ def _scalar(value: int) -> float:
 class Dataset:
     """Represent a SEG-Y dataset."""
 
-    def __init__(self, name, text_hdr, byte_order, dt, numsmp, traces):
+    def __init__(
+            self,
+            name: str,
+            text_hdr: bytes,
+            byte_order: str,
+            dt: int,
+            numsmp: int,
+            traces: list['Trace']
+    ):
         self.name = name
         self.text_hdr = text_hdr
         self.byte_order = byte_order
@@ -36,7 +45,6 @@ class Dataset:
         """Apply SAC and SAED to coordinates and elevations."""
         for trace in self.traces:
             for scale_hdr, hdrs in SCALED_HDRS.items():
-
                 raw = getattr(trace, scale_hdr)
                 coeff = _scalar(raw)
 
@@ -90,15 +98,36 @@ class Dataset:
 
         return bin_array
 
-    def set_hdr(self, hdr: str, value: float) -> None:
-        """Set header value for all traces in dataset."""
-        hdr = hdr.lower()
+    def set_hdr(self, headers: dict[str, float]) -> None:
+        """Set header values for all traces."""
+        headers = {hdr.lower(): value for hdr, value in headers.items()}
 
-        if hdr not in TR_DICT:
-            raise ValueError(f"Unknown header {hdr}")
+        for hdr in headers:
+            if hdr.upper() not in TR_DICT:
+                raise ValueError(f"Unknown header {hdr}")
 
         for trace in self.traces:
-            trace.hdr = value
+            for hdr, value in headers.items():
+                setattr(trace, hdr, value)
+
+    def copy_hdr(self, hdr: str, hdrs: str | list[str]) -> None:
+        """Copy header value to one or multiple headers."""
+        hdr = hdr.lower()
+        if isinstance(hdrs, str):
+            hdrs = [hdrs]
+        hdrs = [h.lower() for h in hdrs]
+
+        headers = [hdr] + hdrs
+
+        for hdr in headers:
+            if hdr.upper() not in TR_DICT:
+                raise ValueError(f"Unknown header {hdr}")
+
+        for trace in self.traces:
+            value = getattr(trace, hdr)
+
+            for h in hdrs:
+                setattr(trace, h, value)
 
     def zero_pad(self, num_samples: int, side: str = "end"):
         """Add zero samples to all traces."""
@@ -126,12 +155,6 @@ class Dataset:
 
         self.numsmp = self.traces[0].numsmp
 
-    def to_section(self, transpose: bool = True) -> np.ndarray:
-        """Return traces as a 2D NumPy array."""
-        section = np.stack([trace.data for trace in self.traces])
-
-        return section.T if transpose else section
-
     def record_length(self, value: float, unit: str = "ms"):
         """Set record length for all traces."""
         if unit == "ms":
@@ -155,6 +178,44 @@ class Dataset:
             return tuple(getattr(tr, h, 0) for h in keys)
 
         self.traces.sort(key=key_fn, reverse=reverse)
+
+    def filter_traces(self, hdr: str, value, include: bool = False) -> None:
+        """Keep or remove traces matching a header value."""
+        hdr = hdr.lower()
+
+        if hdr.upper() not in TR_DICT:
+            raise ValueError(f"Unknown header {hdr}.")
+
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+            values = set(value)
+
+            def match(trace):
+                return getattr(trace, hdr) in values
+        else:
+
+            def match(trace):
+                return getattr(trace, hdr) == value
+
+        self.traces = [tr for tr in self.traces if match(tr) == include]
+
+    @property
+    def section(self) -> np.ndarray:
+        """Return seismic section (samples - traces)."""
+        if not self.traces:
+            raise ValueError("Dataset contains no traces.")
+
+        return np.stack([trace.data for trace in self.traces]).T
+
+    def set_section(self, section: np.ndarray) -> None:
+        """Replace trace data from a seismic section."""
+        if section.ndim != 2:
+            raise ValueError("Section must be a 2D NumPy array.")
+
+        if section.shape != (self.numsmp, len(self.traces)):
+            raise ValueError("Section shape does not match the dataset.")
+
+        for trace, data in zip(self.traces, section.T):
+            trace.data = data.copy()
 
 
 class Trace:

@@ -15,35 +15,36 @@ def proc_flow():
 
     # Import data:
     for file_path in file_paths:
-        seismic_line = sgy_input(file_path)
+        dataset = sgy_input(file_path)
 
         # ----- START of Processing Block -----
 
-        hdr_enumerator(seismic_line, 'TRACENO')
-        hdr_enumerator(seismic_line, 'FFID')
-        hdr_enumerator(seismic_line, 'CDP')
+        dataset.sort_traces('TRACENO')
 
-        line_geom = get_geometry(seismic_line)
-        remove_duplicates(line_geom)
-        linear_interp(line_geom)
+        hdr_enumerator(dataset, 'TRACENO')
+        dataset.copy_hdr('TRACENO', ['SOURCE', 'CDP', 'FFID'])
+        dataset.set_hdr({'CHAN': 1, 'TRC_TYPE': 1, 'OFFSET': 0,})
 
-        for trace, coordinate in zip(seismic_line.traces, line_geom):
+        coordinates = get_geometry(dataset)
+        remove_duplicates(coordinates)
+        linear_interp(coordinates)
+
+        for trace, coordinate in zip(dataset.traces, coordinates):
             trace.sou_x, trace.sou_y = coordinate
-            trace.rec_x, trace.rec_y = coordinate
-            trace.cdp_x, trace.cdp_y = coordinate
 
-        hdr_averager(seismic_line, 'SOU_X', 25)
-        hdr_averager(seismic_line, 'SOU_Y', 25)
+        hdr_averager(dataset, 'SOU_X', 25)
+        dataset.copy_hdr('SOU_X', ['REC_X', 'CDP_X'])
 
-        seismic_line.sort_traces("CDP")
+        hdr_averager(dataset, 'SOU_Y', 25)
+        dataset.copy_hdr('SOU_Y', ['REC_Y', 'CDP_Y'])
 
         # ----- END of Processing Block -----
 
         # Export data:
-        output_path = output_dir / f'{seismic_line.name}.sgy'
-        sgy_output(seismic_line, output_path, sac=-100, saed=-100)
+        output_path = output_dir / f'{dataset.name}.sgy'
+        sgy_output(dataset, output_path, sac=-100, saed=-100)
 
-        print(f"{seismic_line.name} is processed!")
+        print(f"{dataset.name} is processed!")
 
 
 if __name__ == "__main__":

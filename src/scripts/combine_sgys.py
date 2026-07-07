@@ -79,7 +79,7 @@ def main():
 
         combined_dataset.sort_traces("trc_type")
 
-        combined_dataset.set_hdr('TRC_TYPE', 0)
+        combined_dataset.set_hdr({'TRC_TYPE': 0})
 
         hdr_enumerator(combined_dataset, "TRACENO")
         hdr_enumerator(combined_dataset, "FFID")
