@@ -3,8 +3,10 @@ from pathlib import Path
 
 import numpy as np
 
-from stk.config import BIN_DICT, HDRLEN, TR_DICT
+from stk.config import BIN_DICT, TR_DICT
 from stk.utils import pack
+
+BIN_HDR_LEN = 400
 
 
 def get_text_enc(data: bytes) -> str:
@@ -50,17 +52,16 @@ def create_bin_hdr(byte_order=">", **kwargs) -> bytes:
         if key not in BIN_DICT:
             raise KeyError(f"Unknown binary header field: {key}")
 
-    bin_array = bytearray(HDRLEN["bin_hdr"])
-
     bin_hdr = {key: 0 for key in BIN_DICT}
     bin_hdr.update(kwargs)
 
+    bin_array = bytearray(BIN_HDR_LEN)
+
     for parameter, value in bin_hdr.items():
         (offset, _), fmt = BIN_DICT[parameter]
-
         pack(byte_order + fmt, bin_array, offset, value)
 
-    return bin_array
+    return bytes(bin_array)
 
 
 def hdr_enumerator(dataset, hdr: str, start: int = 1, step: int = 1):

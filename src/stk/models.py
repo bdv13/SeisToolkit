@@ -5,8 +5,10 @@ import numpy as np
 
 from stk.config import BIN_DICT, HDRLEN, SCALED_HDRS, TR_DICT
 from stk.utils import pack
+from stk.headers import create_text_hdr, create_bin_hdr
 
 ELEV_COORD_PRECISION = 8
+READ_ONLY_BIN_HDRS = {"dt", "numsmp", "fmt_code"}
 
 
 def _round(value: float, prec: int = ELEV_COORD_PRECISION) -> float:
@@ -72,31 +74,29 @@ class Dataset:
 
                 setattr(trace, scale_hdr, raw_coeff)
 
-    def export_text_hdr(self):
+    def export_text_hdr(self, text_hdr: str | None = None):
         """Return textual header in binary format."""
-        return self.text_hdr
+        text = self.text_hdr if text_hdr is None else text_hdr
+        return create_text_hdr(text)
 
-    def export_bin_hdr(self, **kwargs):
+    def export_bin_hdr(self, **kwargs) -> bytes:
         """Return binary header in binary format."""
 
-        bin_array = bytearray(HDRLEN["bin_hdr"])
+        for key in kwargs:
+            if key.lower() in READ_ONLY_BIN_HDRS:
+                raise ValueError(
+                    f"Binary header field '{key}' is read-only and "
+                    "must be taken from Dataset"
+                )
 
         bin_hdr = {
-            parameter: getattr(self, parameter.lower(), 0) for parameter in BIN_DICT
+            parameter: getattr(self, parameter.lower(), 0)
+            for parameter in BIN_DICT
         }
-
-        for key in kwargs:
-            if key not in BIN_DICT:
-                raise KeyError(f"Unknown binary header field: {key}")
 
         bin_hdr.update(kwargs)
 
-        for parameter, value in bin_hdr.items():
-            (offset, _), fmt = BIN_DICT[parameter]
-
-            pack(self.byte_order + fmt, bin_array, offset, value)
-
-        return bin_array
+        return create_bin_hdr(byte_order=self.byte_order, **bin_hdr)
 
     def set_hdr(self, headers: dict[str, float]) -> None:
         """Set header values for all traces."""

@@ -8,7 +8,8 @@ Python tools for SEG-Y inspection, headers and seismic processing
 - SEG-Y files general information table;
 - Resort traces;
 - Trace length;
-- Trace Header Averager;
+- Trace header averager;
+- Trace headers manipulations;
 - NMEA string parser (GGA, ZDA strings);
 - Export survey tracklines (*csv, *gpkg);
 - Automatic SEG-Y parts finder;

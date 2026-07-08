@@ -14,6 +14,7 @@ def proc_flow():
     output_dir = u.create_folder('output', folder_path)
 
     # Import data:
+    counter = 1
     for file_path in file_paths:
         dataset = sgy_input(file_path)
 
@@ -42,7 +43,18 @@ def proc_flow():
 
         # Export data:
         output_path = output_dir / f'{dataset.name}.sgy'
-        sgy_output(dataset, output_path, sac=-100, saed=-100)
+        sgy_output(
+            dataset,
+            output_path,
+            sac=-100,
+            saed=-100,
+            bin_hdr={
+                'JOB_ID': counter,
+                'LINE_NO': counter,
+            }
+        )
+
+        counter += 1
 
         print(f"{dataset.name} is processed!")
 

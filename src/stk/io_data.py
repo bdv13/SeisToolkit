@@ -5,6 +5,7 @@ import numpy as np
 from stk.config import BIN_DICT, FMT_DICT, TR_DICT
 from stk.models import Dataset, Trace
 from stk.utils import unpack
+from stk.headers import get_text_enc, format_text_hdr
 
 TEXT_HDR_LEN = 3200
 BIN_HDR_LEN = 400
@@ -66,7 +67,10 @@ def sgy_input(file_path: Path) -> Dataset:
 
     with open(file_path, "rb") as f:
         # read textual reader:
-        text_hdr = f.read(TEXT_HDR_LEN)
+        raw_text_hdr = f.read(TEXT_HDR_LEN)
+        text_hdr = format_text_hdr(
+            raw_text_hdr.decode(get_text_enc(raw_text_hdr))
+        )
 
         # read binary header:
         raw_bin_hdr = f.read(BIN_HDR_LEN)
@@ -111,7 +115,9 @@ def sgy_output(
         dataset: Dataset,
         output_path: Path,
         sac: int = 1,
-        saed: int = 1
+        saed: int = 1,
+        text_hdr: str | None = None,
+        bin_hdr: dict | None = None,
 ) -> None:
     """Export dataset object to standard SEG-Y file."""
 
@@ -119,8 +125,8 @@ def sgy_output(
 
     try:
         with open(output_path, "wb") as f:
-            f.write(dataset.export_text_hdr())
-            f.write(dataset.export_bin_hdr())
+            f.write(dataset.export_text_hdr(text_hdr))
+            f.write(dataset.export_bin_hdr(**(bin_hdr or {})))
 
             for trace in dataset.traces:
                 f.write(trace.export_tr_hdr(dataset.byte_order))
