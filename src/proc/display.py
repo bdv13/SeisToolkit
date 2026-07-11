@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def seismic_display(dataset, clip: float = 0.99) -> None:

@@ -234,3 +234,25 @@ def linear_interp(data: list[tuple[float, float]], rouding=2) -> None:
         data[i] = (
             round(float(arr[i, 0]), rouding), round(float(arr[i, 1]), rouding))
 
+
+def track_segments(
+        data: list[tuple[float, float]],
+        threshold: float = 10
+) -> list[list[tuple[float, float]]]:
+    """Split track into continuous segments based on point spacing."""
+    if not data:
+        raise ValueError("Data must contain at least one coordinate")
+
+    _, steps = compute_cumdist(data)
+
+    segments = []
+    start = 0
+
+    for i, step in enumerate(steps):
+        if step > threshold:
+            segments.append(data[start:i + 1])
+            start = i + 1
+
+    segments.append(data[start:])
+
+    return segments

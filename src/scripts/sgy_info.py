@@ -1,4 +1,6 @@
 import os
+from math import atan2, degrees
+from datetime import datetime
 
 import pandas as pd
 
@@ -6,6 +8,49 @@ import stk.utils as u
 from stk.config import FMT_DICT, LOG_DICT
 from stk.geometry import compute_cumdist, get_geometry
 from stk.io_data import sgy_input
+
+
+def get_azimuth(dataset):
+    """Return survey azimuth in degrees (0-360)."""
+    dx = dataset.traces[-1].sou_x - dataset.traces[0].sou_x
+    dy = dataset.traces[-1].sou_y - dataset.traces[0].sou_y
+    if dx == 0 and dy == 0:
+        raise ValueError("Start and end coordinates are identical.")
+    try:
+        return round((degrees(atan2(dx, dy)) + 360) % 360)
+    except Exception:
+        return None
+
+
+def get_avg_speed(length, duration):
+    """Return average survey speed in km/h."""
+    try:
+        hours, minutes = map(int, duration.split(":"))
+        time_hours = hours + minutes / 60
+        avg_speed = length / time_hours
+    except (ZeroDivisionError, ValueError):
+        return "No info"
+    return round(avg_speed, 2)
+
+
+def get_duration(dataset):
+    """Return start time, end time and line duration (HH:MM)."""
+    start = dataset.traces[0].get_dt()
+    end = dataset.traces[-1].get_dt()
+
+    if start == datetime.min and end == datetime.min:
+        return None, None, None
+
+    td = end - start
+    total_minutes = int(td.total_seconds() // 60)
+    hours, minutes = divmod(total_minutes, 60)
+    duration = f"{hours:02}:{minutes:02}"
+
+    return (
+        start.strftime("%Y-%m-%d %H:%M:%S"),
+        end.strftime("%Y-%m-%d %H:%M:%S"),
+        duration
+    )
 
 
 def delay_flag(dataset):
@@ -100,6 +145,9 @@ def info(folder_path=None):
 
         trace_sol, trace_eol = trace_enum(dataset, current_trace)
         current_trace = trace_eol
+        length, mean_step = compute_line_stats(dataset)
+        stime, etime, duration = get_duration(dataset)
+        azimuth = get_azimuth(dataset)
 
         log_file["FFID_SOL"] = trace_sol
         log_file["FFID_EOL"] = trace_eol
@@ -108,14 +156,20 @@ def info(folder_path=None):
         log_file["Sample_Freq_hz"] = 1_000_000 / dataset.dt
         log_file["Byte_order"] = dataset.byte_order
         log_file["Format"] = FMT_DICT[dataset.fmt_code][0]
-        log_file["Length_km"] = compute_line_stats(dataset)[0]
-        log_file["Mean_step_m"] = compute_line_stats(dataset)[1]
+        log_file["Length_km"] = length
+        log_file["Mean_step_m"] = mean_step
         log_file["Delay"] = delay_flag(dataset)
+        log_file["Start_Time"] = stime if stime is not None else "No info"
+        log_file["End_Time"] = etime if etime is not None else "No info"
+        log_file["Duration"] = duration if duration is not None else "No info"
+        log_file["Speed_kmh"] = get_avg_speed(length, duration)
+        log_file["Azimuth"] = azimuth if azimuth is not None else "No info"
 
         write_log_file(log_file, log_path)
 
 
 if __name__ == "__main__":
     print()
+    print("Select folder with sgy files.", end="\n\n")
     info()
     print(f"Done! Complited in {info.elapsed_time:.3f} sec", end="\n\n")

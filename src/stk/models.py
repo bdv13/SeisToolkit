@@ -278,7 +278,7 @@ class Trace:
 
         self.numsmp = len(self.data)
 
-    def get_datetime(self):
+    def get_dt(self):
         """Return trace datetime object from headers."""
         try:
             return datetime(self.year, 1, 1) + timedelta(

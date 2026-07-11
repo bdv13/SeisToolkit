@@ -74,7 +74,7 @@ def get_paths(
 
 def get_size_mb(file_path: Path) -> float:
     """Get file size in mb."""
-    return file_path.stat().st_size / 1024**2
+    return round(file_path.stat().st_size / 1024**2, 2)
 
 
 def pack(fmt: str, hdr: bytearray, offset: int, value: Any) -> None:

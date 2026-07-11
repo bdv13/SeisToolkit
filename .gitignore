@@ -219,5 +219,5 @@ __marimo__/
 
 # User-specific files
 output/
-tests/test_data/
+test_data/
 temp.py
