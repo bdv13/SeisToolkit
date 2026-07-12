@@ -12,10 +12,10 @@ def is_compatible(datasets):
     trace_numsmp = []
 
     for dataset in datasets:
-        bin_dt_check.add(dataset.dt)
+        bin_dt_check.add(dataset.dt_us)
 
         for trace in dataset.traces:
-            tr_dt_check.add(trace.dt)
+            tr_dt_check.add(trace.dt_us)
             trace_numsmp.append(trace.numsmp)
 
     if len(bin_dt_check) != 1 or len(tr_dt_check) != 1:
@@ -42,13 +42,7 @@ def combine_datasets(datasets: list[Dataset]) -> Dataset:
 
     text_hdr = create_text_hdr()
 
-    return Dataset(
-        "merged",
-        text_hdr, ">",
-        first.dt,
-        max_numsmp,
-        combined_traces
-    )
+    return Dataset("merged", text_hdr, ">", first.dt_us, max_numsmp, combined_traces)
 
 
 @u.timer
@@ -79,19 +73,14 @@ def main():
 
         combined_dataset.sort_traces("trc_type")
 
-        combined_dataset.set_hdr({'TRC_TYPE': 1})
+        combined_dataset.set_hdr({"TRC_TYPE": 1})
 
         hdr_enumerator(combined_dataset, "TRACENO")
-        combined_dataset.copy_hdr('TRACENO', ['FFID', 'SOURCE', 'CDP'])
+        combined_dataset.copy_hdr("TRACENO", ["FFID", "SOURCE", "CDP"])
 
         output_path = output_folder / f"Line_{group_number + 1}.sgy"
 
-        sgy_output(
-            combined_dataset,
-            output_path,
-            sac=-100,
-            saed=-100
-        )
+        sgy_output(combined_dataset, output_path, sac=-100, saed=-100)
 
         print(f"Group {group_number + 1} exported successfully!")
 

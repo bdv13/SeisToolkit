@@ -1,6 +1,6 @@
 import os
-from math import atan2, degrees
 from datetime import datetime
+from math import atan2, degrees
 
 import pandas as pd
 
@@ -49,7 +49,7 @@ def get_duration(dataset):
     return (
         start.strftime("%Y-%m-%d %H:%M:%S"),
         end.strftime("%Y-%m-%d %H:%M:%S"),
-        duration
+        duration,
     )
 
 
@@ -151,9 +151,9 @@ def info(folder_path=None):
 
         log_file["FFID_SOL"] = trace_sol
         log_file["FFID_EOL"] = trace_eol
-        log_file["dt_ms"] = dataset.dt / 1000
-        log_file["Length_ms"] = dataset.dt * dataset.numsmp / 1000
-        log_file["Sample_Freq_hz"] = 1_000_000 / dataset.dt
+        log_file["dt_ms"] = dataset.dt_us / 1000
+        log_file["Length_ms"] = dataset.dt_us * dataset.numsmp / 1000
+        log_file["Sample_Freq_hz"] = 1_000_000 / dataset.dt_us
         log_file["Byte_order"] = dataset.byte_order
         log_file["Format"] = FMT_DICT[dataset.fmt_code][0]
         log_file["Length_km"] = length

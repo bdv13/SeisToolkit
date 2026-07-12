@@ -4,10 +4,9 @@ from stk.models import Dataset
 
 
 def _validate_bandpass_args(
-        dataset: Dataset,
-        freqs: tuple[float, float, float, float],
-        taper_percent: float,
-        threads: int,
+    dataset: Dataset,
+    freqs: tuple[float, float, float, float],
+    taper_percent: float,
 ) -> None:
     """Validate band-pass filter arguments."""
 
@@ -19,8 +18,8 @@ def _validate_bandpass_args(
     if not 0 <= taper_percent < 50:
         raise ValueError("taper_percent must be between 0 and 50.")
 
-    if threads < 1:
-        raise ValueError("threads must be >= 1.")
+    if dataset.numsmp < 32:
+        raise ValueError("Trace too short for filtering.")
 
     if f1 < 0:
         raise ValueError("Frequencies must be non-negative.")
@@ -28,15 +27,13 @@ def _validate_bandpass_args(
     if not (f1 < f2 <= f3 < f4):
         raise ValueError("Frequencies must satisfy f1 < f2 <= f3 < f4.")
 
-    if dataset.dt <= 0:
+    if dataset.dt_us <= 0:
         raise ValueError("Invalid sample interval.")
 
-    nyquist = 1_000_000 / dataset.dt / 2
-
-    if f4 >= nyquist:
+    if f4 >= dataset.nyquist:
         raise ValueError(
-            f"Maximum frequency ({f4} Hz) exceeds "
-            f"Nyquist frequency ({nyquist:.1f} Hz)."
+            f'Maximum frequency ({f4} Hz) exceeds Nyquist frequency '
+            f'({dataset.nyquist:.1f} Hz).'
         )
 
 
@@ -45,8 +42,8 @@ def _calculate_taper_samples(numsmp: int, taper_percent: float) -> int:
     return int(round(numsmp * taper_percent / 100))
 
 
-def _add_taper(data: np.ndarray, taper_samples: int) -> np.ndarray:
-    """Add cosine tapered padding to both sides of a trace."""
+def _add_tapered_padding(data: np.ndarray, taper_samples: int) -> np.ndarray:
+    """Add tapered padding to reduce FFT edge artifacts."""
     if data.size == 0:
         raise ValueError("Trace data is empty.")
     if taper_samples < 0:
@@ -54,9 +51,7 @@ def _add_taper(data: np.ndarray, taper_samples: int) -> np.ndarray:
     if taper_samples == 0:
         return data
     if taper_samples * 2 >= len(data):
-        raise ValueError(
-            "taper_samples must be smaller than half of trace length."
-        )
+        raise ValueError("taper_samples must be smaller than half of trace length.")
 
     # Generate cosine taper coefficients from 0 to 1.
     taper = np.sin(
@@ -74,11 +69,11 @@ def _add_taper(data: np.ndarray, taper_samples: int) -> np.ndarray:
     return np.concatenate((left_pad, data, right_pad))
 
 
-def _remove_taper(
-        data: np.ndarray,
-        taper_samples: int,
+def _remove_padding(
+    data: np.ndarray,
+    taper_samples: int,
 ) -> np.ndarray:
-    """Remove cosine tapered padding from both sides of a trace."""
+    """Remove tapered padding from both sides of a trace."""
     if data.size == 0:
         raise ValueError("Trace data is empty.")
     if taper_samples < 0:
@@ -86,32 +81,31 @@ def _remove_taper(
     if taper_samples == 0:
         return data
     if taper_samples * 2 >= len(data):
-        raise ValueError(
-            "taper_samples must be smaller than half of trace length."
-        )
+        raise ValueError("taper_samples must be smaller than half of trace length.")
 
     return data[taper_samples:-taper_samples]
 
 
-def _build_ormsby_response(
-        numsmp: int,
-        dt: int,
-        freqs: tuple[float, float, float, float],
+def _build_bandpass_response(
+    numsmp: int,
+    dt_us: float,
+    freqs: tuple[float, float, float, float],
 ) -> np.ndarray:
-    """Build Ormsby band-pass frequency response."""
+    """Build band-pass frequency response."""
 
     f1, f2, f3, f4 = freqs
 
     # Positive frequency bins corresponding to np.fft.rfft().
-    frequency_axis = np.fft.rfftfreq(numsmp, dt / 1_000_000)
+    frequency_axis = np.fft.rfftfreq(numsmp, dt_us / 1_000_000)
 
     # Initialize the frequency response with zero gain.
     response = np.zeros_like(frequency_axis)
 
-    # Build the Ormsby frequency response:
-    # - Hanning taper from 0 to 1 over [f1, f2];
+    # Build a trapezoidal band-pass response with
+    # Hann-tapered transition bands.
+    # - Hann taper from 0 to 1 over [f1, f2];
     # - unity gain over [f2, f3];
-    # - Hanning taper from 1 to 0 over [f3, f4].
+    # - Hann taper from 1 to 0 over [f3, f4].
 
     left_slope = (frequency_axis >= f1) & (frequency_axis < f2)
     left_slope_fraction = (frequency_axis[left_slope] - f1) / (f2 - f1)
@@ -128,24 +122,29 @@ def _build_ormsby_response(
 
 
 def _apply_bandpass(
-        data: np.ndarray,
-        response: np.ndarray,
-        taper_samples: int,
-        fft_length: int,
+    data: np.ndarray,
+    response: np.ndarray,
+    taper_samples: int,
+    fft_length: int,
 ) -> np.ndarray:
-    """Apply Ormsby filter to a single trace."""
+    """Apply a band-pass filter to a single trace."""
 
-    # Add tapering
-    tapered_trace = _add_taper(data, taper_samples)
+    # Add tapered padding.
+    tapered_trace = _add_tapered_padding(data, taper_samples)
 
-    # Apply Ormsby frequency response in the frequency domain.
+    # Apply band-pass frequency response in the frequency domain.
     filt_spectrum = np.fft.rfft(tapered_trace)
+
+    if filt_spectrum.shape != response.shape:
+        raise RuntimeError(
+            "Frequency response length does not match FFT spectrum."
+        )
+
     filt_spectrum *= response
 
     # Transform spectrum back to time domain and remove artificial taper padding
-    filtered_trace = _remove_taper(
-        np.fft.irfft(filt_spectrum, n=fft_length),
-        taper_samples
+    filtered_trace = _remove_padding(
+        np.fft.irfft(filt_spectrum, n=fft_length), taper_samples
     )
 
     if filtered_trace.shape != data.shape:
@@ -155,26 +154,21 @@ def _apply_bandpass(
 
 
 def bandpass_filter(
-        dataset: Dataset,
-        freqs: tuple[float, float, float, float],
-        taper_percent: float = 10.0,
-        threads: int = 1
+    dataset: Dataset,
+    freqs: tuple[float, float, float, float],
+    taper_percent: float = 10.0,
 ) -> None:
-    """Apply an Ormsby band-pass filter to all traces."""
+    """Apply a band-pass filter to all traces."""
 
     # Validate input parameters
-    _validate_bandpass_args(dataset, freqs, taper_percent, threads)
+    _validate_bandpass_args(dataset, freqs, taper_percent)
 
-    # Build Ormsby frequency response.
+    # Build band-pass frequency response.
     taper_samples = _calculate_taper_samples(dataset.numsmp, taper_percent)
     fft_length = dataset.numsmp + 2 * taper_samples
-    response = _build_ormsby_response(
-        fft_length,
-        dataset.dt,
-        freqs
-    )
+    response = _build_bandpass_response(fft_length, dataset.dt_us, freqs)
 
-    # Apply Ormsby bandpass filter to each trace in dataset
+    # Apply bandpass filter to each trace in dataset
     for trace in dataset.traces:
         trace.data = _apply_bandpass(
             trace.data,

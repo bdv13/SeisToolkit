@@ -9,7 +9,7 @@ def seismic_display(dataset, clip: float = 0.99) -> None:
     vmax = np.quantile(np.abs(section), clip)
 
     nt, ntr = section.shape
-    time_axis = np.arange(nt) * dataset.dt / 1000
+    time_axis = np.arange(nt) * dataset.dt_us / 1000
 
     plt.figure(figsize=(14, 6))
 

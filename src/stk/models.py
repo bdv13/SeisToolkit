@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from stk.config import BIN_DICT, HDRLEN, SCALED_HDRS, TR_DICT
+from stk.headers import create_bin_hdr, create_text_hdr
 from stk.utils import pack
-from stk.headers import create_text_hdr, create_bin_hdr
 
 ELEV_COORD_PRECISION = 8
 READ_ONLY_BIN_HDRS = {"dt", "numsmp", "fmt_code"}
@@ -27,18 +27,18 @@ class Dataset:
     """Represent a SEG-Y dataset."""
 
     def __init__(
-            self,
-            name: str,
-            text_hdr: bytes,
-            byte_order: str,
-            dt: int,
-            numsmp: int,
-            traces: list['Trace']
+        self,
+        name: str,
+        text_hdr: bytes,
+        byte_order: str,
+        dt: int,
+        numsmp: int,
+        traces: list["Trace"],
     ):
         self.name = name
         self.text_hdr = text_hdr
         self.byte_order = byte_order
-        self.dt = dt
+        self.dt_us = dt
         self.numsmp = numsmp
         self.fmt_code = 5
         self.traces = traces
@@ -90,8 +90,7 @@ class Dataset:
                 )
 
         bin_hdr = {
-            parameter: getattr(self, parameter.lower(), 0)
-            for parameter in BIN_DICT
+            parameter: getattr(self, parameter.lower(), 0) for parameter in BIN_DICT
         }
 
         bin_hdr.update(kwargs)
@@ -158,7 +157,7 @@ class Dataset:
     def record_length(self, value: float, unit: str = "ms"):
         """Set record length for all traces."""
         if unit == "ms":
-            target_samples = int(round(value * 1000 / self.dt))
+            target_samples = int(round(value * 1000 / self.dt_us))
         else:
             target_samples = int(value)
 
@@ -216,6 +215,11 @@ class Dataset:
 
         for trace, data in zip(self.traces, section.T):
             trace.data = data.copy()
+
+    @property
+    def nyquist(self) -> float:
+        """Return Nyquist frequency."""
+        return  1_000_000 / self.dt_us / 2
 
 
 class Trace:

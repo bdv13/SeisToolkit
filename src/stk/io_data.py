@@ -36,13 +36,18 @@ def parse_hdrs(data: bytes, byte_order: str, hdr_dict: dict) -> dict:
 
 def ibm_to_ieee(arr: np.ndarray) -> np.ndarray:
     """Convert IBM floating-point values to IEEE float32."""
-    sign = (arr >> 31) & 0x01
-    exponent = (arr >> 24) & 0x7F
+    arr = arr.astype(np.uint32, copy=False)
+    sign = (arr >> 31) & 1
+    exponent = ((arr >> 24) & 0x7F).astype(np.int32)
     mantissa = arr & 0x00FFFFFF
-    out = np.zeros_like(arr, dtype=np.float32)
+    out = np.zeros(arr.shape, dtype=np.float64)
     mask = arr != 0
-    out[mask] = (mantissa[mask] / 0x1000000) * (16 ** (exponent[mask] - 64))
-    out[mask] *= np.where(sign[mask] == 1, -1.0, 1.0)
+    out[mask] = (
+        mantissa[mask].astype(np.float64)
+        / 16777216.0
+        * np.power(16.0, exponent[mask] - 64)
+    )
+    out[mask] *= np.where(sign[mask], -1.0, 1.0)
     return out.astype(np.float32)
 
 
@@ -84,7 +89,7 @@ def sgy_input(file_path: Path) -> Dataset:
 
         bps = FMT_DICT[fmt_code][1]
 
-        dt = bin_hdr["dt"]
+        dt = bin_hdr["dt_us"]
         numsmp = bin_hdr["NUMSMP"]
 
         # read trace data -> Trace objects:
