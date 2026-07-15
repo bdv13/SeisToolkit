@@ -1,12 +1,14 @@
 from collections.abc import Iterable
 from datetime import datetime, timedelta
+from typing import Literal
 
 import numpy as np
 
-from stk.config import BIN_DICT, HDRLEN, SCALED_HDRS, TR_DICT
+from stk.config import BIN_DICT, SCALED_HDRS, TR_DICT
 from stk.headers import create_bin_hdr, create_text_hdr
 from stk.utils import pack
 
+TR_HDR_LEN = 240
 ELEV_COORD_PRECISION = 8
 READ_ONLY_BIN_HDRS = {"dt", "numsmp", "fmt_code"}
 
@@ -29,7 +31,7 @@ class Dataset:
     def __init__(
         self,
         name: str,
-        text_hdr: bytes,
+        text_hdr: str,
         byte_order: str,
         dt: int,
         numsmp: int,
@@ -74,7 +76,7 @@ class Dataset:
 
                 setattr(trace, scale_hdr, raw_coeff)
 
-    def export_text_hdr(self, text_hdr: str | None = None):
+    def export_text_hdr(self, text_hdr: str | None = None) -> bytes:
         """Return textual header in binary format."""
         text = self.text_hdr if text_hdr is None else text_hdr
         return create_text_hdr(text)
@@ -118,9 +120,9 @@ class Dataset:
 
         headers = [hdr] + hdrs
 
-        for hdr in headers:
-            if hdr.upper() not in TR_DICT:
-                raise ValueError(f"Unknown header {hdr}")
+        for h in headers:
+            if h.upper() not in TR_DICT:
+                raise ValueError(f"Unknown header {h}")
 
         for trace in self.traces:
             value = getattr(trace, hdr)
@@ -128,18 +130,29 @@ class Dataset:
             for h in hdrs:
                 setattr(trace, h, value)
 
-    def zero_pad(self, num_samples: int, side: str = "end"):
+    def zero_pad(
+            self,
+            num_samples: int,
+            side: Literal["start", "end"] = "end"
+    ) -> None:
         """Add zero samples to all traces."""
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
+
+        if not self.traces:
+            raise ValueError("Dataset has no traces")
 
         for trace in self.traces:
             trace.zero_pad(num_samples, side)
 
         self.numsmp = self.traces[0].numsmp
 
-    def clip(self, num_samples: int):
-        """Remove samples from the end of all traces."""
+    def clip(
+            self,
+            num_samples: int,
+            side: Literal["start", "end"] = "end"
+    ) -> None:
+        """Remove samples from the beginning or end of all traces."""
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
@@ -150,11 +163,15 @@ class Dataset:
             raise ValueError("num_samples exceeds trace length")
 
         for trace in self.traces:
-            trace.clip(num_samples)
+            trace.clip(num_samples, side)
 
         self.numsmp = self.traces[0].numsmp
 
-    def record_length(self, value: float, unit: str = "ms"):
+    def record_length(
+            self,
+            value: float,
+            unit: Literal["ms", "samples"] = "ms"
+    ) -> None:
         """Set record length for all traces."""
         if unit == "ms":
             target_samples = int(round(value * 1000 / self.dt_us))
@@ -219,7 +236,7 @@ class Dataset:
     @property
     def nyquist(self) -> float:
         """Return Nyquist frequency."""
-        return  1_000_000 / self.dt_us / 2
+        return 1_000_000 / (2 * self.dt_us)
 
 
 class Trace:
@@ -229,9 +246,9 @@ class Trace:
         self.__dict__.update({k.lower(): v for k, v in tr_hdr.items()})
         self.data = tr_data
 
-    def export_tr_hdr(self, byte_order=">"):
+    def export_tr_hdr(self, byte_order: str = ">") -> bytearray:
         """Return trace header in binary format."""
-        tr_array = bytearray(HDRLEN["trace_hdr"])
+        tr_array = bytearray(TR_HDR_LEN)
 
         tr_hdr = {
             parameter: getattr(self, parameter.lower(), 0) for parameter in TR_DICT
@@ -244,7 +261,7 @@ class Trace:
 
         return tr_array
 
-    def export_tr_data(self, byte_order=">"):
+    def export_tr_data(self, byte_order: str = ">") -> bytes:
         """Return trace samples in IEEE float32 format."""
         data = np.asarray(self.data, dtype=np.float32)
 
@@ -255,7 +272,11 @@ class Trace:
 
         return data.tobytes()
 
-    def zero_pad(self, num_samples: int, side: str = "end"):
+    def zero_pad(
+        self,
+        num_samples: int,
+        side: Literal["start", "end"] = "end"
+    ) -> None:
         """Add zero samples to trace data."""
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
@@ -269,16 +290,24 @@ class Trace:
 
         self.numsmp = len(self.data)
 
-    def clip(self, num_samples: int):
-        """Remove samples from the end of trace."""
+    def clip(
+            self,
+            num_samples: int,
+            side: Literal["start", "end"] = "end"
+    ) -> None:
+        """Remove samples from the beginning or end of the trace."""
         if num_samples < 0:
             raise ValueError("num_samples must be >= 0")
 
         if num_samples > len(self.data):
             raise ValueError("num_samples exceeds trace length")
 
-        if num_samples:
-            self.data = self.data[:-num_samples]
+        if side == "end":
+            self.data = self.data[:-num_samples] if num_samples else self.data
+        elif side == "start":
+            self.data = self.data[num_samples:]
+        else:
+            raise ValueError("side must be 'start' or 'end'")
 
         self.numsmp = len(self.data)
 

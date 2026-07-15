@@ -220,4 +220,5 @@ __marimo__/
 # User-specific files
 output/
 test_data/
-temp.py
+tmp_single_proc.py
+tmp_batch_proc.py

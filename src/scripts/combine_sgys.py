@@ -15,7 +15,7 @@ def is_compatible(datasets):
         bin_dt_check.add(dataset.dt_us)
 
         for trace in dataset.traces:
-            tr_dt_check.add(trace.dt_us)
+            tr_dt_check.add(trace.dt)
             trace_numsmp.append(trace.numsmp)
 
     if len(bin_dt_check) != 1 or len(tr_dt_check) != 1:
@@ -40,7 +40,7 @@ def combine_datasets(datasets: list[Dataset]) -> Dataset:
 
     combined_traces = [tr for ds in datasets for tr in ds.traces]
 
-    text_hdr = create_text_hdr()
+    text_hdr = ' '
 
     return Dataset("merged", text_hdr, ">", first.dt_us, max_numsmp, combined_traces)
 
@@ -66,14 +66,14 @@ def main():
         datasets_group = [sgy_input(file) for file in group]
         combined_dataset = combine_datasets(datasets_group)
 
-        cumdists, steps = compute_cumdist(get_geometry(combined_dataset))
+        cumdists, _ = compute_cumdist(get_geometry(combined_dataset))
 
         for cumdist, trace in zip(cumdists, combined_dataset.traces):
             trace.trc_type = cumdist
 
         combined_dataset.sort_traces("trc_type")
 
-        combined_dataset.set_hdr({"TRC_TYPE": 1})
+        combined_dataset.set_hdr({"trc_type": 1})
 
         hdr_enumerator(combined_dataset, "TRACENO")
         combined_dataset.copy_hdr("TRACENO", ["FFID", "SOURCE", "CDP"])
@@ -92,5 +92,5 @@ if __name__ == "__main__":
     print()
     print(f"Done! Complited in {main.elapsed_time:.3f} sec", end="\n\n")
     print("Select folder (unmerged files), then single lines list", end="\n\n")
-    u.separate_files()
+    u.separate_files(operation='copy')
     print("Done!")
