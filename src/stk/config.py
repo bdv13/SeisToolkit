@@ -1,4 +1,8 @@
-HDRLEN = {"text_hdr": 3200, "bin_hdr": 400, "trace_hdr": 240}
+TEXT_HDR_LEN = 3200
+BIN_HDR_LEN = 400
+TR_HDR_LEN = 240
+ELEV_COORD_PRECISION = 8
+
 
 BIN_DICT = {
     "JOB_ID": ((0, 4), "i"),
@@ -32,6 +36,8 @@ BIN_DICT = {
     "SEGY_REV": ((300, 302), "H"),
     "FIXED_LEN_TR": ((302, 304), "H"),
 }
+
+READ_ONLY_BIN_HDRS = {"dt", "numsmp", "fmt_code"}
 
 TR_DICT = {
     "TRACENO": ((0, 4), "i"),
@@ -145,13 +151,6 @@ FMT_DICT = {
     10: ("32-bit Unsigned", 4, ">u4"),
     11: ("16-bit Unsigned", 2, ">u2"),
     12: ("64-bit Unsigned", 8, ">u8"),
-}
-
-UNITS_DICT = {
-    1: "Meters",
-    2: "Arc Seconds",
-    3: "Degrees",
-    4: "DMS",
 }
 
 LOG_DICT = {

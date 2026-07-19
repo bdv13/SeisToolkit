@@ -8,8 +8,11 @@ Python tools for SEG-Y inspection, headers and seismic processing
 - SEG-Y files general information table;
 - Resort traces;
 - Trace length;
-- DC removal (mean, median);
+- DC removal;
 - Bandpass filter;
+- Apply statics from header;
+- Datasets difference;
+- Trace stacking;
 - Trace header averager;
 - Trace headers manipulations;
 - NMEA string parser (GGA, ZDA strings);

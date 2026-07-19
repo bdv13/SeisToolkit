@@ -3,10 +3,8 @@ from pathlib import Path
 
 import numpy as np
 
-from stk.config import BIN_DICT, TR_DICT
+from stk.config import BIN_DICT, TR_DICT, BIN_HDR_LEN
 from stk.utils import pack
-
-BIN_HDR_LEN = 400
 
 
 def get_text_enc(data: bytes) -> str:

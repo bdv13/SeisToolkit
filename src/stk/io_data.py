@@ -2,14 +2,17 @@ from pathlib import Path
 
 import numpy as np
 
-from stk.config import BIN_DICT, FMT_DICT, TR_DICT
+from stk.config import (
+    TEXT_HDR_LEN,
+    BIN_HDR_LEN,
+    TR_HDR_LEN,
+    BIN_DICT,
+    FMT_DICT,
+    TR_DICT,
+)
 from stk.models import Dataset, Trace
 from stk.utils import unpack
 from stk.headers import get_text_enc, format_text_hdr
-
-TEXT_HDR_LEN = 3200
-BIN_HDR_LEN = 400
-TR_HDR_LEN = 240
 
 
 def get_byte_order(bin_hdr: bytes) -> str:

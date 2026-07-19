@@ -4,13 +4,16 @@ from typing import Literal
 
 import numpy as np
 
-from stk.config import BIN_DICT, SCALED_HDRS, TR_DICT
 from stk.headers import create_bin_hdr, create_text_hdr
 from stk.utils import pack
-
-TR_HDR_LEN = 240
-ELEV_COORD_PRECISION = 8
-READ_ONLY_BIN_HDRS = {"dt", "numsmp", "fmt_code"}
+from stk.config import (
+    TR_HDR_LEN,
+    BIN_DICT,
+    SCALED_HDRS,
+    READ_ONLY_BIN_HDRS,
+    TR_DICT,
+    ELEV_COORD_PRECISION,
+)
 
 
 def _round(value: float, prec: int = ELEV_COORD_PRECISION) -> float:
@@ -83,7 +86,6 @@ class Dataset:
 
     def export_bin_hdr(self, **kwargs) -> bytes:
         """Return binary header in binary format."""
-
         for key in kwargs:
             if key.lower() in READ_ONLY_BIN_HDRS:
                 raise ValueError(
@@ -221,6 +223,13 @@ class Dataset:
             raise ValueError("Dataset contains no traces.")
 
         return np.stack([trace.data for trace in self.traces]).T
+
+    def trace_data(self) -> np.ndarray:
+        """Return trace data (traces - samples)."""
+        if not self.traces:
+            raise ValueError("Dataset contains no traces.")
+
+        return np.stack([trace.data for trace in self.traces])
 
     def set_section(self, section: np.ndarray) -> None:
         """Replace trace data from a seismic section."""
