@@ -1,18 +1,20 @@
+import os
 from pathlib import Path
+from typing import BinaryIO
 
 import numpy as np
 
 from stk.config import (
-    TEXT_HDR_LEN,
-    BIN_HDR_LEN,
-    TR_HDR_LEN,
     BIN_DICT,
+    BIN_HDR_LEN,
     FMT_DICT,
+    TEXT_HDR_LEN,
     TR_DICT,
+    TR_HDR_LEN,
 )
+from stk.headers import format_text_hdr, get_text_enc
 from stk.models import Dataset, Trace
 from stk.utils import unpack
-from stk.headers import get_text_enc, format_text_hdr
 
 
 def get_byte_order(bin_hdr: bytes) -> str:
@@ -69,63 +71,105 @@ def decode_trace(raw_tr: bytes, fmt_code: int, byte_order: str) -> np.ndarray:
         raise ValueError(f"Unsupported format: {fmt_code}")
 
 
-def sgy_input(file_path: Path) -> Dataset:
+def _read_text_hdr(stream: BinaryIO) -> str:
+    """Read and format SEG-Y textual header."""
+    raw_hdr = stream.read(TEXT_HDR_LEN)
+    encoding = get_text_enc(raw_hdr)
+    return format_text_hdr(raw_hdr.decode(encoding))
+
+
+def _read_bin_hdr(stream: BinaryIO) -> tuple[dict, str]:
+    """Read and parse SEG-Y binary header."""
+    raw_hdr = stream.read(BIN_HDR_LEN)
+    byte_order = get_byte_order(raw_hdr)
+    bin_hdr = parse_hdrs(raw_hdr, byte_order, BIN_DICT)
+    return bin_hdr, byte_order
+
+
+def _get_bps(fmt_code: int) -> int:
+    """Get bytes per sample (bps) value."""
+    if fmt_code not in FMT_DICT:
+        raise ValueError(f"Unsupported SEG-Y format code: {fmt_code}")
+    return FMT_DICT[fmt_code][1]
+
+
+def _read_trace_hdr(stream: BinaryIO, byte_order: str) -> dict | None:
+    """Read and parse SEG-Y trace header."""
+    raw_hdr = stream.read(TR_HDR_LEN)
+    if len(raw_hdr) != TR_HDR_LEN:
+        return None
+    return parse_hdrs(raw_hdr, byte_order, TR_DICT)
+
+
+def _read_trace_data(
+    stream: BinaryIO,
+    byte_order: str,
+    fmt_code: int,
+    num_bytes: int,
+) -> np.ndarray | None:
+    """Read and decode SEG-Y trace data."""
+    raw_data = stream.read(num_bytes)
+    if len(raw_data) != num_bytes:
+        return None
+    return decode_trace(raw_data, fmt_code, byte_order)
+
+
+def sgy_input(
+    file_path: Path, headers_only: bool = False, normalize_hdrs: bool = True
+) -> Dataset:
     """Read a SEG-Y file and return a dataset object."""
-    file_name = Path(file_path).stem
 
-    with open(file_path, "rb") as f:
-        # read textual reader:
-        raw_text_hdr = f.read(TEXT_HDR_LEN)
-        text_hdr = format_text_hdr(
-            raw_text_hdr.decode(get_text_enc(raw_text_hdr))
-        )
+    file_name = file_path.stem
 
-        # read binary header:
-        raw_bin_hdr = f.read(BIN_HDR_LEN)
-        byte_order = get_byte_order(raw_bin_hdr)
-        bin_hdr = parse_hdrs(raw_bin_hdr, byte_order, BIN_DICT)
+    with open(file_path, "rb") as sgy_file:
+        text_hdr = _read_text_hdr(sgy_file)
+        bin_hdr, byte_order = _read_bin_hdr(sgy_file)
 
         fmt_code = bin_hdr["FMT_CODE"]
+        bps = _get_bps(fmt_code)
 
-        if fmt_code not in FMT_DICT:
-            raise ValueError(f"Unsupported SEG-Y format code: {fmt_code}")
-
-        bps = FMT_DICT[fmt_code][1]
-
-        dt = bin_hdr["dt_us"]
-        numsmp = bin_hdr["NUMSMP"]
-
-        # read trace data -> Trace objects:
         traces = []
         while True:
-            # read trace headers:
-            raw_tr_hdr = f.read(TR_HDR_LEN)
-            if len(raw_tr_hdr) < TR_HDR_LEN:
+            tr_hdr = _read_trace_hdr(sgy_file, byte_order)
+            if tr_hdr is None:
                 break
-            tr_hdr = parse_hdrs(raw_tr_hdr, byte_order, TR_DICT)
 
-            # read trace data:
-            numsmp = tr_hdr["NUMSMP"]
-            raw_data = f.read(bps * numsmp)
-            if len(raw_data) < bps * numsmp:
-                break
-            tr_data = decode_trace(raw_data, fmt_code, byte_order)
+            num_bytes = bps * tr_hdr["NUMSMP"]
+
+            if headers_only:
+                sgy_file.seek(num_bytes, os.SEEK_CUR)
+                tr_data = None
+
+            else:
+                tr_data = _read_trace_data(
+                    sgy_file,
+                    byte_order,
+                    fmt_code,
+                    num_bytes,
+                )
+
+                if tr_data is None:
+                    raise EOFError("Unexpected end of SEG-Y trace data.")
 
             traces.append(Trace(tr_hdr, tr_data))
 
-        dataset = Dataset(file_name, text_hdr, byte_order, dt, numsmp, traces)
-        dataset.norm_hdrs()
+        dataset = Dataset(
+            file_name, text_hdr, byte_order, bin_hdr["dt_us"], bin_hdr["NUMSMP"], traces
+        )
 
-    return dataset
+        if not headers_only and normalize_hdrs:
+            dataset.norm_hdrs()
+
+        return dataset
 
 
 def sgy_output(
-        dataset: Dataset,
-        output_path: Path,
-        sac: int = 1,
-        saed: int = 1,
-        text_hdr: str | None = None,
-        bin_hdr: dict | None = None,
+    dataset: Dataset,
+    output_path: Path,
+    sac: int = 1,
+    saed: int = 1,
+    text_hdr: str | None = None,
+    bin_hdr: dict | None = None,
 ) -> None:
     """Export dataset object to standard SEG-Y file."""
 

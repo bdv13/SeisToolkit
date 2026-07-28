@@ -1,6 +1,6 @@
 import stk.utils as u
 from stk.geometry import compute_cumdist, get_geometry
-from stk.headers import create_text_hdr, hdr_enumerator
+from stk.headers import hdr_enumerator
 from stk.io_data import sgy_input, sgy_output
 from stk.models import Dataset
 

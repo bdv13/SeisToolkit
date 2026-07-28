@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Literal
+from pathlib import Path
 
 import numpy as np
 
@@ -331,3 +333,51 @@ class Trace:
             )
         except Exception:
             return datetime.min
+
+
+@dataclass(slots=True)
+class Picks:
+    """Seismic picks container."""
+
+    hdrs: dict[str, list[int]]
+    samples: np.ndarray
+    dt_us: int
+
+    @property
+    def twt_ms(self) -> np.ndarray:
+        """Return two-way travel time in milliseconds."""
+        return self.samples * self.dt_us / 1000
+
+    @property
+    def size(self) -> int:
+        return len(self.samples)
+
+    def _validate_hdrs(self, *hdrs):
+        for hdr in hdrs:
+            if hdr not in self.hdrs:
+                raise KeyError(f"Header '{hdr}' is not found!")
+            if len(self.hdrs[hdr]) != self.size:
+                raise ValueError(f"{hdr} has wrong length!")
+
+    def export_rdx_pick(
+            self,
+            hdr1: str,
+            hdr2: str,
+            output_path: Path,
+    ) -> None:
+        """Export picks to RadExPro txt format."""
+
+        self._validate_hdrs(hdr1, hdr2)
+
+        with open(output_path, "w", encoding="utf-8") as f:
+
+            # write file header:
+            f.write(f"{hdr1}:{hdr2}\n")
+
+            # write values:
+            for val1, val2, twt in zip(
+                self.hdrs[hdr1],
+                self.hdrs[hdr2],
+                self.twt_ms
+            ):
+                f.write(f"{val1:15d}:{val2:15d}{twt:15.4f}\n")

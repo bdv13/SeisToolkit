@@ -89,6 +89,13 @@ def nmea_to_decimal(value: SupportsFloat, hemisphere: str) -> float:
     return decimal
 
 
+def deg_to_dms(value: float) -> str:
+    d = int(abs(value))
+    m = int((abs(value) - d) * 60)
+    s = (abs(value) - d - m / 60) * 3600
+    return f'{d}°{m:02d}\'{s:06.3f}"'
+
+
 def get_utm_zone(lat: float, lon: float) -> str:
     """Return UTM zone (e.g. '35N') for WGS84 coordinates"""
     if lat is None or lon is None:
