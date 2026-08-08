@@ -17,6 +17,7 @@ dependencies = [
     "pyogrio",
     "obspy",
     "numba>=0.66.0",
+    "pyinstaller>=6.21.0",
 ]
 
 

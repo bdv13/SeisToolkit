@@ -21,11 +21,11 @@ OUTPUT_FIELDS = (
     ("HOUR", "{hour}"),
     ("MIN", "{minute}"),
     ("SEC", "{second}"),
-    ("LAT", "{lat:.9f}"),
-    ("LON", "{lon:.9f}"),
+    ("GPS_LAT", "{lat:.9f}"),
+    ("GPS_LON", "{lon:.9f}"),
     ("UTM_ZONE", "{utm_zone}"),
-    ("X", "{utm_x:.3f}"),
-    ("Y", "{utm_y:.3f}"),
+    ("GPS_X", "{utm_x:.3f}"),
+    ("GPS_Y", "{utm_y:.3f}"),
     ("HEADING", "{heading:06.2f}"),
     ("SPEED", "{speed:.1f}"),
 )
@@ -132,9 +132,10 @@ def _check_checksum(line: str) -> bool:
 
 def _is_valid_nmea(sentence: str) -> bool:
     """Check whether an NMEA 0183 sentence is valid."""
-    return (bool(sentence)
-            and sentence.startswith("$")
-            and _check_checksum(sentence)
+    return (
+        bool(sentence)
+        and sentence.startswith("$")
+        and _check_checksum(sentence)
     )
 
 
@@ -215,9 +216,7 @@ def parse_rmc(fields: Sequence[str]) -> RMC | None:
 
         return RMC(
             timestamp=datetime.combine(
-                rmc_date,
-                rmc_time,
-                tzinfo=timezone.utc
+                rmc_date, rmc_time, tzinfo=timezone.utc
             ),
             lat=lat,
             lon=lon,
@@ -349,11 +348,21 @@ def batch_nmea_parser() -> None:
         nmea_parser(log_path, output_path)
         files_counter += 1
 
+    print("Merging files into one file ...")
+    u.merge_txt_files(
+        folder=output_folder,
+        output_name='gps_logs_120726-160726',
+        has_header=True,
+        add_source_file=True,
+        source_file_sep=" ",
+    )
+
 
 if __name__ == "__main__":
     print()
     print("Please select folder with NMEA logs (.nmea)", end="\n\n")
     batch_nmea_parser()
-    print(f"Done! Completed in {batch_nmea_parser.elapsed_time:.3f} sec",
-          end="\n\n"
+    print(
+        f"Done! Completed in {batch_nmea_parser.elapsed_time:.3f} sec",
+        end="\n\n",
     )

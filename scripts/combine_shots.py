@@ -92,7 +92,8 @@ def _combine_shots(file_paths: list[Path], output_path: Path) -> None:
 def main(folder_path=None):
     """Merge SGY files into one SGY file."""
     if not folder_path:
-        folder_path = u.select_folder()
+        folder_path = u.select_folder(
+            title="Please, select folder with shots (sgy files)\n")
 
     file_paths = u.get_paths(folder_path)
     output_path = folder_path / "merged.sgy"
@@ -101,6 +102,5 @@ def main(folder_path=None):
 
 
 if __name__ == "__main__":
-    print("Please, select forlder with shots (sgy files):", end="\n")
     main()
     print("Done!", end="\n")

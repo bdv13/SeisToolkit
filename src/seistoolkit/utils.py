@@ -8,13 +8,13 @@ from tkinter import filedialog
 from typing import Any, Literal
 
 
-def select_file() -> Path | None:
+def select_file(title='Select file') -> Path | None:
     """Select file. Returns file path."""
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
     file_path = filedialog.askopenfilename(
-        title="Select file", filetypes=[("All files", "*.*")]
+        title=title, filetypes=[("All files", "*.*")]
     )
     root.destroy()
 
@@ -25,12 +25,12 @@ def select_file() -> Path | None:
     return Path(file_path)
 
 
-def select_folder() -> Path | None:
+def select_folder(title='Select folder') -> Path | None:
     """Select folder. Returns folder path."""
     root = tk.Tk()
     root.attributes("-topmost", True)
     root.withdraw()
-    folder_path = filedialog.askdirectory(title="Select folder")
+    folder_path = filedialog.askdirectory(title=title)
     root.destroy()
 
     if not folder_path:
@@ -47,9 +47,9 @@ def create_folder(folder_name: str, path: Path) -> Path:
 
 
 def get_paths(
-        folder_path: Path,
-        formats: tuple[str, ...] = (".sgy", ".segy"),
-        export: bool = False
+    folder_path: Path,
+    formats: tuple[str, ...] = (".sgy", ".segy"),
+    export: bool = False,
 ) -> list[Path] | None:
     """Collect file paths with specified extensions."""
     folder = Path(folder_path)
@@ -83,9 +83,7 @@ def pack(fmt: str, hdr: bytearray, offset: int, value: Any) -> None:
 
 
 def unpack(
-        byte_order: str,
-        fmt: str, data: bytes,
-        byte_range: tuple[int, int]
+    byte_order: str, fmt: str, data: bytes, byte_range: tuple[int, int]
 ) -> Any:
     """Extract and unpack a value from a byte sequence."""
     start, end = byte_range
@@ -135,6 +133,48 @@ def delete(path: Path) -> None:
         raise ValueError(f"Unsupported path type: {path}")
 
 
+def merge_txt_files(
+    folder: Path,
+    output_name: str = 'merged',
+    has_header: bool = True,
+    add_source_file: bool = True,
+    source_file_sep: str = " ",
+) -> Path:
+    """Merge txt files from a folder into one file."""
+    file_paths = get_paths(folder, (".txt",))
+
+    if not file_paths:
+        raise FileNotFoundError(f"No txt files found in {folder}")
+
+    file_paths = sorted(file_paths)
+    output_path = folder / f'{output_name}.txt'
+
+    is_first_file = True
+
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        for file_path in file_paths:
+            with open(file_path, "r", encoding="utf-8") as input_file:
+                for index, line in enumerate(input_file):
+                    line = line.rstrip("\n")
+
+                    if index == 0 and has_header:
+                        if not is_first_file:
+                            continue
+
+                        if add_source_file:
+                            line += f"{source_file_sep}FILE_NAME"
+
+                    elif add_source_file:
+                        source_name = file_path.name.replace(' ', '_')
+                        line += f"{source_file_sep}{source_name}"
+
+                    output_file.write(line + "\n")
+
+            is_first_file = False
+
+    return output_path
+
+
 def timer(func):
     """Estimate function execution time."""
     @wraps(func)
@@ -144,5 +184,6 @@ def timer(func):
         end = time.perf_counter()
         wrapper.elapsed_time = end - start
         return result
+
     wrapper.elapsed_time = 0
     return wrapper
