@@ -90,34 +90,62 @@ def unpack(
     return struct.unpack(byte_order + fmt, data[start:end])[0]
 
 
-def separate_files(operation: Literal["copy", "move"] = "copy"):
-    """Copy or move files listed in a text file to a separate folder."""
-    folder_path = select_folder()
-    files_list = select_file()
+def separate_files(
+    operation: Literal["copy", "move"] = "copy",
+    input_type: Literal["paths", "names"] = "paths",
+) -> None:
+    """Copy or move files listed in a TXT file to a separate folder."""
+
+    folder_path = select_folder("Select folder with files")
+    files_list = select_file("Select TXT file")
 
     output_folder = create_folder("separated_files", folder_path)
 
     with open(files_list, "r", encoding="utf-8") as f:
         files = [line.strip() for line in f if line.strip()]
 
+    counter = 0
+    total = len(files)
+
     for file in files:
-        file_name = Path(file).name
+        if input_type == "paths":
+            source_file = Path(file)
+            file_name = source_file.name
 
-        source_file = folder_path / file_name
+        elif input_type == "names":
+            file_path = Path(file)
+            file_name = file_path.name
+
+            if file_path.suffix:
+                source_file = folder_path / file_name
+            else:
+                matches = list(folder_path.glob(f"{file_name}.*"))
+
+                if not matches:
+                    raise FileNotFoundError(
+                        f"File not found: {file_name}"
+                    )
+
+                source_file = matches[0]
+                file_name = source_file.name
+
+        else:
+            raise ValueError("Unknown input type!")
+
         destination_file = Path(output_folder) / file_name
-
-        if not source_file.exists():
-            print(f"File not found: {source_file}")
-            continue
 
         if operation == "copy":
             shutil.copy2(source_file, destination_file)
+            counter += 1
 
         elif operation == "move":
             shutil.move(source_file, destination_file)
+            counter += 1
 
         else:
-            raise ValueError("Unknown command!")
+            raise ValueError("Unknown operation!")
+
+    print(f"Successfully {operation}ed {counter} of {total} files.")
 
 
 def delete(path: Path) -> None:

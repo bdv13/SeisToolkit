@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import seistoolkit.utils as u
 from seistoolkit.geometry import compute_cumdist, get_geometry
 from seistoolkit.headers import hdr_enumerator
@@ -53,11 +55,12 @@ def combine_datasets(datasets: list[Dataset]) -> Dataset:
 
 @u.timer
 def main():
-    """
-    Combine multiple SEG-Y datasets into ordered seismic lines and export them.
-    """
-    folder_path = u.select_folder()
+    """Combine multiple SEG-Y datasets into seismic lines ."""
+    folder_path = u.select_folder(
+        "Please, select 'Groups' folder with groups.")
+
     group_paths = u.get_paths(folder_path, (".txt",))
+
     output_folder = u.create_folder("combined_lines", folder_path)
 
     groups_list = []
@@ -65,7 +68,7 @@ def main():
         group = []
         with open(group_path, "r", encoding="utf-8") as f:
             for line in f:
-                group.append(line.strip())
+                group.append(Path(line.strip()))
         groups_list.append(group)
 
     for group_number, group in enumerate(groups_list):
@@ -84,19 +87,27 @@ def main():
         hdr_enumerator(combined_dataset, "TRACENO")
         combined_dataset.copy_hdr("TRACENO", ["FFID", "SOURCE", "CDP"])
 
-        output_path = output_folder / f"Line_{group_number + 1}.sgy"
+        # output file name = first file in merged group
+        output_path = output_folder / f"{group[0].stem}.sgy"
 
-        sgy_output(combined_dataset, output_path, sac=-100, saed=-100)
+        # add merged lines list in textual header
+        text_hdr = "MERGED LINES:\n"
+        for file in group:
+            text_hdr += f"{file.name}\n"
+
+        sgy_output(
+            combined_dataset,
+            output_path,
+            sac=-100,
+            saed=-100,
+            text_hdr=text_hdr
+        )
 
         print(f"Group {group_number + 1} exported successfully!")
 
 
 if __name__ == "__main__":
-    print()
-    print("Please, select 'Groups' folder with groups.", end="\n\n")
     main()
-    print()
-    print(f"Done! Complited in {main.elapsed_time:.3f} sec", end="\n\n")
     print("Select folder (unmerged files), then single lines list", end="\n\n")
     u.separate_files(operation="copy")
-    print("Done!")
+    print(f"Done! Complited in {main.elapsed_time:.3f} sec", end="\n\n")

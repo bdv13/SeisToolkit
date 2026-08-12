@@ -1,4 +1,5 @@
 import shutil
+import sys
 import threading
 import tkinter as tk
 from datetime import datetime
@@ -98,6 +99,14 @@ def simulate_seismic_files(
         print("\nSimulation completed. All files used.")
 
 
+def resource_path(relative_path: str) -> Path:
+    """Get path to bundled resource."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / relative_path
+
+    return Path(__file__).resolve().parent.parent / relative_path
+
+
 class SimSeisGUI(tk.Tk):
     """Application GUI."""
 
@@ -108,7 +117,7 @@ class SimSeisGUI(tk.Tk):
         self.geometry("500x225")
         self.resizable(False, False)
 
-        self.iconbitmap("assets/simseis.ico")
+        self.iconbitmap(resource_path("assets/simseis.ico"))
 
         self.stop_event = threading.Event()
 
@@ -317,4 +326,5 @@ if __name__ == "__main__":
     app.mainloop()
 
 
-# pyinstaller --onefile --console --icon=assets/simseis.ico scripts/simseis.py
+# pyinstaller --onefile --windowed --icon=assets/simseis.ico --add-data
+# "assets/simseis.ico;assets" scripts/simseis.py

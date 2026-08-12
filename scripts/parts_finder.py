@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from scipy.spatial import KDTree
 
@@ -41,15 +42,71 @@ def extract_nav(file_paths: list, output_file: Path):
     nav_df.to_csv(output_file, index=False, sep="\t", encoding="utf-8")
 
 
-def find_parts(nav_file, res_file, tolerance=5):
+def is_overlap_exceeded(
+    line_a,
+    line_b,
+    tolerance,
+    max_overlap_traces=5,
+):
+    """Return True if overlap exceeds the allowed number of traces."""
+    points_a = line_a["points"]
+    points_b = line_b["points"]
+
+    # Direction of line A
+    origin = points_a[0]
+    direction = points_a[-1] - origin
+
+    length = np.linalg.norm(direction)
+
+    if length == 0:
+        return False
+
+    direction /= length
+
+    # Project points onto the direction of line A
+    proj_a = (points_a - origin) @ direction
+    proj_b = (points_b - origin) @ direction
+
+    a_end = proj_a.max()
+
+    # Only B traces located within A's longitudinal range
+    overlap_points = points_b[
+        (proj_b >= 0) & (proj_b <= a_end)
+    ]
+
+    if len(overlap_points) == 0:
+        return False
+
+    # Check which B traces are spatially close to A
+    tree = KDTree(points_a)
+    distances, _ = tree.query(overlap_points)
+
+    overlap_traces = np.count_nonzero(
+        distances <= tolerance
+    )
+
+    return overlap_traces > max_overlap_traces
+
+
+def find_parts(
+    nav_file,
+    res_file,
+    tolerance=5,
+    max_overlap_tr=10,
+) -> None:
 
     nav_df = pd.read_csv(nav_file, sep="\t")
 
     lines = {}
+
     for name, group in nav_df.groupby("LINE"):
-        start = (group.iloc[0]["SOU_X"], group.iloc[0]["SOU_Y"])
-        end = (group.iloc[-1]["SOU_X"], group.iloc[-1]["SOU_Y"])
-        lines[name] = {"start": start, "end": end}
+        points = group[["SOU_X", "SOU_Y"]].to_numpy()
+
+        lines[name] = {
+            "start": tuple(points[0]),
+            "end": tuple(points[-1]),
+            "points": points,
+        }
 
     line_names = list(lines.keys())
     start_points = [lines[name]["start"] for name in line_names]
@@ -58,11 +115,15 @@ def find_parts(nav_file, res_file, tolerance=5):
 
     connections = {name: set() for name in line_names}
 
+    overlap_rej_count = 0
+
     for name_a in line_names:
         a = lines[name_a]
 
         distances, idxs = tree.query(
-            a["end"], k=len(line_names), distance_upper_bound=tolerance
+            a["end"],
+            k=len(line_names),
+            distance_upper_bound=tolerance,
         )
 
         for dist, j in zip(distances, idxs):
@@ -70,6 +131,7 @@ def find_parts(nav_file, res_file, tolerance=5):
                 continue
 
             name_b = line_names[j]
+
             if name_a == name_b:
                 continue
 
@@ -84,6 +146,16 @@ def find_parts(nav_file, res_file, tolerance=5):
             )
 
             if d_forward < d_backward and d_forward < tolerance:
+
+                if is_overlap_exceeded(
+                    lines[name_a],
+                    lines[name_b],
+                    tolerance,
+                    max_overlap_tr,
+                ):
+                    overlap_rej_count += 1
+                    continue
+
                 connections[name_a].add(name_b)
                 connections[name_b].add(name_a)
 
@@ -99,6 +171,7 @@ def find_parts(nav_file, res_file, tolerance=5):
 
         while stack:
             cur = stack.pop()
+
             if cur in visited:
                 continue
 
@@ -108,7 +181,15 @@ def find_parts(nav_file, res_file, tolerance=5):
 
         groups.append(sorted(group))
 
-    groups_sorted = sorted(groups, key=lambda g: (-len(g), g))
+    groups_sorted = sorted(
+        groups,
+        key=lambda g: (-len(g), g),
+    )
+
+    print(
+        f"{overlap_rej_count} connections were not made "
+        f"due to overlap."
+    )
 
     # Save results:
     with open(res_file, "w", encoding="utf-8") as f:
@@ -198,7 +279,7 @@ def main():
     single_lines = output_folder / "fparts_single_lines.txt"
 
     extract_nav(file_paths, nav_file)
-    find_parts(nav_file, res_file, tolerance=5)
+    find_parts(nav_file, res_file, tolerance=5, max_overlap_tr=15)
     prefix = folder_path
     create_pathslist(prefix, res_file, group_folder, single_lines)
 

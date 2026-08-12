@@ -56,6 +56,51 @@ class RMC:
     course: float | None
 
 
+def sort_log_by_timestamp(input_file: Path) -> None:
+    """Sort log file rows by timestamp."""
+    lines = input_file.read_text(encoding="utf-8").splitlines()
+    header = lines[0]
+    data = lines[1:]
+    data.sort(key=lambda line: f"{line.split()[0]} {line.split()[1]}")
+    input_file.write_text("\n".join([header, *data]) + "\n", encoding="utf-8")
+
+
+def split_log_by_jd(input_file: Path, output_folder: Path) -> None:
+    """Split a log file into separate files by Julian Day."""
+
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    files = {}
+
+    with input_file.open("r", encoding="utf-8", newline="") as src:
+        header = src.readline()
+
+        for line in src:
+            if not line.strip():
+                continue
+
+            fields = line.split()
+
+            jd = fields[3]
+            log_date = fields[0]
+
+            if jd not in files:
+                output_file = output_folder / f"JD_{jd}_{log_date}.txt"
+
+                files[jd] = output_file.open(
+                    "w",
+                    encoding="utf-8",
+                    newline=""
+                )
+
+                files[jd].write(header)
+
+            files[jd].write(line)
+
+    for file in files.values():
+        file.close()
+
+
 def _get_output_header() -> str:
     return " ".join(header for header, _ in OUTPUT_FIELDS) + "\n"
 
@@ -351,10 +396,21 @@ def batch_nmea_parser() -> None:
     print("Merging files into one file ...")
     u.merge_txt_files(
         folder=output_folder,
-        output_name='gps_logs_120726-160726',
+        output_name='gps_logs',
         has_header=True,
         add_source_file=True,
         source_file_sep=" ",
+    )
+
+    print("\nSorting...")
+    sort_log_by_timestamp(output_folder / "gps_logs.txt")
+
+    print("\nSpliting files by JD ...")
+    jd_logs = u.create_folder("gps_logs", output_folder)
+
+    split_log_by_jd(
+        input_file=output_folder / "gps_logs.txt",
+        output_folder=jd_logs,
     )
 
 
@@ -363,6 +419,6 @@ if __name__ == "__main__":
     print("Please select folder with NMEA logs (.nmea)", end="\n\n")
     batch_nmea_parser()
     print(
-        f"Done! Completed in {batch_nmea_parser.elapsed_time:.3f} sec",
+        f"\nDone! Completed in {batch_nmea_parser.elapsed_time:.3f} sec",
         end="\n\n",
     )

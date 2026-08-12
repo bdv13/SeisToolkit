@@ -218,8 +218,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # User-specific files
-output/
 test_data/
 dev/
-tmp_single_proc.py
-tmp_batch_proc.py
+assets/
+exe.txt
+workflows/

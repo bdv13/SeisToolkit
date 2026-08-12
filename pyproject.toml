@@ -18,6 +18,10 @@ dependencies = [
     "obspy",
     "numba>=0.66.0",
     "pyinstaller>=6.21.0",
+    "keyboard>=0.13.5",
+    "pyautogui>=0.9.54",
+    "pyperclip>=1.11.0",
+    "pywin32>=312",
 ]
 
 
