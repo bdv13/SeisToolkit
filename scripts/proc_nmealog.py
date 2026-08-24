@@ -56,6 +56,20 @@ class RMC:
     course: float | None
 
 
+@dataclass(slots=True)
+class HDT:
+    heading: float | None
+
+
+@dataclass(slots=True)
+class VTG:
+    true_course: float | None
+    magnetic_course: float | None
+    speed_knots: float | None
+    speed_kmh: float | None
+    mode: str | None
+
+
 def sort_log_by_timestamp(input_file: Path) -> None:
     """Sort log file rows by timestamp."""
     lines = input_file.read_text(encoding="utf-8").splitlines()
@@ -87,11 +101,7 @@ def split_log_by_jd(input_file: Path, output_folder: Path) -> None:
             if jd not in files:
                 output_file = output_folder / f"JD_{jd}_{log_date}.txt"
 
-                files[jd] = output_file.open(
-                    "w",
-                    encoding="utf-8",
-                    newline=""
-                )
+                files[jd] = output_file.open("w", encoding="utf-8", newline="")
 
                 files[jd].write(header)
 
@@ -184,12 +194,26 @@ def _is_valid_nmea(sentence: str) -> bool:
     )
 
 
-def parse_hdt(fields: Sequence[str]) -> float | None:
-    """Parse an NMEA 0183 HDT sentence into vessel true heading in degrees."""
+def parse_vtg(fields: Sequence[str]) -> VTG | None:
+    """Parse an NMEA 0183 VTG sentence."""
+    if len(fields) < 10:
+        return None
+
+    return VTG(
+        true_course=_parse_value(fields[1], float),
+        magnetic_course=_parse_value(fields[3], float),
+        speed_knots=_parse_value(fields[5], float),
+        speed_kmh=_parse_value(fields[7], float),
+        mode=fields[9] or None,
+    )
+
+
+def parse_hdt(fields: Sequence[str]) -> HDT | None:
+    """Parse an NMEA 0183 HDT sentence."""
     if len(fields) < 2:
         return None
 
-    return _parse_value(fields[1], float)
+    return HDT(heading=_parse_value(fields[1], float))
 
 
 def parse_zda(fields: Sequence[str]) -> datetime | None:
@@ -274,7 +298,7 @@ def parse_rmc(fields: Sequence[str]) -> RMC | None:
 
 
 def nmea_parser(log_path: Path, output_path: Path) -> None:
-    """Parse NMEA log file using GGA, ZDA, HDT sentences."""
+    """Parse NMEA log file using GGA, ZDA, HDT, RMC and VTG sentences."""
 
     stats = NMEALogStats()
 
@@ -309,14 +333,28 @@ def nmea_parser(log_path: Path, output_path: Path) -> None:
 
                 continue
 
+            if msg_type == "VTG":
+                stats.vtg_count += 1
+                vtg = parse_vtg(packets)
+
+                if vtg is None:
+                    stats.vtg_errors += 1
+                else:
+                    if vtg.true_course is not None:
+                        current_heading = vtg.true_course
+                    if vtg.speed_knots is not None:
+                        current_speed = vtg.speed_knots
+
+                continue
+
             if msg_type == "HDT":
                 stats.hdt_count += 1
-                heading = parse_hdt(packets)
+                hdt = parse_hdt(packets)
 
-                if heading is not None:
-                    current_heading = heading
-                else:
+                if hdt is None:
                     stats.hdt_errors += 1
+                elif hdt.heading is not None:
+                    current_heading = hdt.heading
 
                 continue
 
@@ -326,7 +364,7 @@ def nmea_parser(log_path: Path, output_path: Path) -> None:
 
                 if rmc is None:
                     stats.rmc_errors += 1
-                else:
+                elif rmc.speed is not None:
                     current_speed = rmc.speed
 
                 continue
@@ -396,7 +434,7 @@ def batch_nmea_parser() -> None:
     print("Merging files into one file ...")
     u.merge_txt_files(
         folder=output_folder,
-        output_name='gps_logs',
+        output_name="gps_logs",
         has_header=True,
         add_source_file=True,
         source_file_sep=" ",

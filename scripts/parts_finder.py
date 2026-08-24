@@ -279,7 +279,7 @@ def main():
     single_lines = output_folder / "fparts_single_lines.txt"
 
     extract_nav(file_paths, nav_file)
-    find_parts(nav_file, res_file, tolerance=5, max_overlap_tr=15)
+    find_parts(nav_file, res_file, tolerance=5, max_overlap_tr=20)
     prefix = folder_path
     create_pathslist(prefix, res_file, group_folder, single_lines)
 

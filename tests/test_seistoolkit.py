@@ -6,6 +6,7 @@ import pytest
 from scripts.export_nav import export_nav
 from scripts.proc_nmealog import nmea_parser
 from seistoolkit.headers import hdrs_export
+from seistoolkit.models import Picks
 from seistoolkit.segy import sgy_input, sgy_output
 
 
@@ -25,6 +26,27 @@ def test_nmea_parser(tmp_path):
     assert output_file.stat().st_size > 0
 
 
+def test_import_picks_from_tsv(tmp_path):
+    input_file = tmp_path / "picks.txt"
+    input_file.write_text(
+        "S_LINE\tFFID\tCHAN\tFBPICK\n1\t100\t3\t125.5\n1\t101\t4\t130\n",
+        encoding="utf-8",
+    )
+
+    picks = Picks.import_txt(
+        input_file,
+        ("S_LINE", "FFID", "CHAN"),
+        "FBPICK",
+    )
+
+    assert picks.hdrs == {
+        "S_LINE": [1, 1],
+        "FFID": [100, 101],
+        "CHAN": [3, 4],
+    }
+    np.testing.assert_array_equal(picks.twt_ms, [125.5, 130.0])
+
+
 def test_export_geom(tmp_path, sgy_file):
     input_file = tmp_path / "Line_001.sgy"
     input_file.write_bytes(sgy_file.read_bytes())
@@ -36,8 +58,8 @@ def test_export_geom(tmp_path, sgy_file):
 def test_export_hdrs(tmp_path, sgy_file):
     output_path = tmp_path / "headers.txt"
     dataset = sgy_input(sgy_file)
-    hdrs_export(dataset, output_path, [
-        "FFID", "SOU_X", "SOU_Y", "YEAR", "DAY"]
+    hdrs_export(
+        dataset, output_path, ["FFID", "SOU_X", "SOU_Y", "YEAR", "DAY"]
     )
     assert output_path.exists()
 

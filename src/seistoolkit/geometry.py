@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from math import floor, hypot
+from pathlib import Path
 from typing import SupportsFloat
 
 import geopandas as gpd
@@ -9,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pyproj import CRS, Transformer
 from scipy.interpolate import interp1d
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 
 @lru_cache(maxsize=64)
@@ -91,7 +92,7 @@ def nmea_to_decimal(value: SupportsFloat, hemisphere: str) -> float:
 
 
 def deg_to_dms(value: float) -> str:
-    """ Converts decimal degrees to a degrees-minutes-seconds (DMS) string."""
+    """Converts decimal degrees to a degrees-minutes-seconds (DMS) string."""
     d = int(abs(value))
     m = int((abs(value) - d) * 60)
     s = (abs(value) - d - m / 60) * 3600
@@ -279,6 +280,7 @@ class NMEALogStats:
     zda_count: int = 0
     rmc_count: int = 0
     hdt_count: int = 0
+    vtg_count: int = 0
     others_count: int = 0
 
     # Skipped lines
@@ -288,6 +290,7 @@ class NMEALogStats:
     # Errors
     zda_errors: int = 0
     hdt_errors: int = 0
+    vtg_errors: int = 0
     rmc_errors: int = 0
     gga_errors: int = 0
 
@@ -296,6 +299,7 @@ class NMEALogStats:
         return (
             self.zda_errors
             + self.hdt_errors
+            + self.vtg_errors
             + self.rmc_errors
             + self.gga_errors
         )
@@ -316,6 +320,7 @@ class NMEALogStats:
         print(f"ZDA: {self.zda_count}")
         print(f"RMC: {self.rmc_count}")
         print(f"HDT: {self.hdt_count}")
+        print(f"VTG: {self.vtg_count}")
         print(f"Other: {self.others_count}")
         print()
         print(f"Skipped: {self.skipped} ({self.skipped_percent:.2f}%)")
@@ -323,9 +328,42 @@ class NMEALogStats:
         print(f"Missing: {self.missing_data}")
         print(
             f"Parse issues: {self.parse_errors} "
-            f"(GGA: {self.gga_errors}, "
+            f"GGA: {self.gga_errors}, "
             f"ZDA: {self.zda_errors}, "
             f"RMC: {self.rmc_errors}, "
-            f"HDT: {self.hdt_errors})"
+            f"HDT: {self.hdt_errors}, "
+            f"VTG: {self.vtg_errors}"
         )
         print()
+
+
+def txt_to_points(
+    file_path: Path,
+    coord_cols: tuple[str, str],
+    crs: str,
+    separator: str = ' '
+) -> None:
+    """Convert TXT file into GeoPackage with points and attributes."""
+    data = pd.read_csv(
+        file_path,
+        sep=separator,
+        header=0,
+    )
+
+    x_col, y_col = coord_cols
+
+    geometry = [Point(x, y) for x, y in zip(data[x_col], data[y_col])]
+
+    gdf = gpd.GeoDataFrame(
+        data,
+        geometry=geometry,
+        crs=crs,
+    )
+
+    output_path = file_path.with_suffix(".gpkg")
+
+    gdf.to_file(
+        output_path,
+        layer=file_path.stem,
+        driver="GPKG",
+    )

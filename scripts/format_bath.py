@@ -5,7 +5,7 @@ from seistoolkit.geometry import deg_to_dms, utm_to_wgs84
 
 HEADER = "File,X,Y,Z\n"
 UTM_ZONE = "35N"
-SHIFT = -0.55
+SHIFT = 0
 
 
 def _formatter(
