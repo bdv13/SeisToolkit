@@ -3,11 +3,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scripts.export_nav import export_nav
-from scripts.proc_nmealog import nmea_parser
-from seistoolkit.headers import hdrs_export
-from seistoolkit.models import Picks
-from seistoolkit.segy import sgy_input, sgy_output
+from scripts.prc.export_nav import export_nav
+from scripts.prc.proc_nmealog import nmea_parser
+from seistoolkit.models import Pick
+from seistoolkit.tools.hdrs import export_hdrs
+from seistoolkit.tools.io import sgy_input, sgy_output
 
 
 def test_io(tmp_path, sgy_file):
@@ -33,7 +33,7 @@ def test_import_picks_from_tsv(tmp_path):
         encoding="utf-8",
     )
 
-    picks = Picks.import_txt(
+    picks = Pick.import_txt(
         input_file,
         ("S_LINE", "FFID", "CHAN"),
         "FBPICK",
@@ -58,8 +58,10 @@ def test_export_geom(tmp_path, sgy_file):
 def test_export_hdrs(tmp_path, sgy_file):
     output_path = tmp_path / "headers.txt"
     dataset = sgy_input(sgy_file)
-    hdrs_export(
-        dataset, output_path, ["FFID", "SOU_X", "SOU_Y", "YEAR", "DAY"]
+    export_hdrs(
+        dataset=dataset,
+        hdrs=["FFID", "SOU_X", "SOU_Y", "YEAR", "DAY"],
+        output_path=output_path,
     )
     assert output_path.exists()
 
